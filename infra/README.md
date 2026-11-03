@@ -15,7 +15,7 @@ script only creates what is missing. No credentials or keys live in this repo.
 Environment SGs never reference each other, so **traffic between dev, stage and
 prod is denied**. SSH is key-only (Ubuntu 24.04 default) and never open to
 `0.0.0.0/0`. Servers use IMDSv2 and encrypted-in-transit package sources.
-`t3.medium` (4 GiB) is a first estimate; resize if Neo4j + Kafka need more.
+`c7i-flex.large` (CI/CD, 4 GiB) and `t3.small` (environments, 2 GiB + swap) are a first estimate; resize if Neo4j + Kafka need more.
 
 ## Prerequisites
 

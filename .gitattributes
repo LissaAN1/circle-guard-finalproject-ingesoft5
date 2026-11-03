@@ -1,2 +1,5 @@
 .githooks/* text eol=lf
 .github/workflows/*.yml text eol=lf
+infra/**/*.sh text eol=lf
+infra/*.sh text eol=lf
+infra/config.env text eol=lf

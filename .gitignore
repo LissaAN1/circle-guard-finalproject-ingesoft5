@@ -46,3 +46,9 @@ web-build/
 *_data/
 pgdata/
 neo4jdata/
+
+# Cloud credentials and key material (never commit)
+*.pem
+*.ppk
+.aws/
+infra/.env

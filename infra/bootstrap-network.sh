@@ -42,7 +42,7 @@ for e in dev stage prod; do
   allow "$ENV" 22 "cidr:$IP"  "ssh admin"
   allow "$ENV" 22 "sg:$CICD"  "ssh from jenkins"
   allow "$ENV" 80 "cidr:0.0.0.0/0" "web client"
-  for p in 8180 8083 8084 8085 8086 8087; do
+  for p in 8180 8082 8083 8084 8085 8086 8087 8088; do
     allow "$ENV" "$p" "sg:$CICD" "service $p from cicd (smoke/e2e)"
     allow "$ENV" "$p" "cidr:$IP" "service $p from admin"
   done

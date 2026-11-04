@@ -11,3 +11,4 @@ ids=(); for n in "${names[@]}"; do i="$(instance_id "$n")"; [[ -n "$i" ]] && ids
 aws ec2 "${action}-instances" --instance-ids "${ids[@]}" --query 'length(*[0])' --output text >/dev/null
 log "$action requested for: ${names[*]}"
 [[ "$action" == start ]] && log "public IPs change after start; run infra/status.sh"
+exit 0

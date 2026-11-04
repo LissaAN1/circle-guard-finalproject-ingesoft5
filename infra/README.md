@@ -10,7 +10,7 @@ script only creates what is missing. No credentials or keys live in this repo.
 | Security group | Servers | Inbound |
 |:---|:---|:---|
 | `circleguard-sg-cicd` | jenkins, sonarqube, nexus | 22, 8080 (Jenkins), 9000 (SonarQube), 8081/8082 (Nexus) from the admin IP; 8081/8082 from the env SGs (image/artifact pull) |
-| `circleguard-sg-dev/stage/prod` | one server each | 22 from admin IP and from the CI/CD SG; 80 public (web client); service ports 8180, 8083-8087 from CI/CD SG and admin IP |
+| `circleguard-sg-dev/stage/prod` | one server each | 22 from admin IP and from the CI/CD SG; 80 public (web client); service ports 8180, 8082-8088 from CI/CD SG and admin IP |
 
 Environment SGs never reference each other, so **traffic between dev, stage and
 prod is denied**. SSH is key-only (Ubuntu 24.04 default) and never open to

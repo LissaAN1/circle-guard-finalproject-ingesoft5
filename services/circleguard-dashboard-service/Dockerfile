@@ -7,7 +7,7 @@ FROM gradle:8.14-jdk21 AS build
 WORKDIR /workspace
 ENV GRADLE_USER_HOME=/home/gradle/.gradle
 
-# Se usa la imagen oficial de Gradle: gradle-wrapper.jar no esta versionado (ver .gitignore)
+# Se usa la imagen oficial de Gradle con gradle-wrapper.jar versionado en el repositorio.
 COPY settings.gradle.kts build.gradle.kts ./
 COPY services/ ./services/
 

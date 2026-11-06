@@ -1,0 +1,16 @@
+.git
+.gradle
+**/build
+**/bin
+**/node_modules
+mobile/dist
+mobile/.expo
+mobile/web-build
+docs
+design-assets
+scratch
+*.pdf
+*.tex
+*.png
+*_output.txt
+.agent

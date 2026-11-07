@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-
 # HU-01: helpers for deploying CI/CD tools on the EC2 hosts created by TEC-04.
 set -euo pipefail
 
@@ -37,7 +36,7 @@ bootstrap_target() {
   [[ -n "$addr" && "$addr" != None ]] || die "EC2 ${PROJECT}-${role} has no public IPv4"
 
   BOOTSTRAP_TARGET_IP="$addr"
-  BOOTSTRAP_SSH_KEY="${KEY_DIR}/${KEY_NAME}.pem"
+  BOOTSTRAP_SSH_KEY="${CIRCLEGUARD_SSH_KEY:-${KEY_DIR}/${KEY_NAME}.pem}"
 
   [[ -r "$BOOTSTRAP_SSH_KEY" ]] || die "SSH key not found: $BOOTSTRAP_SSH_KEY"
 }

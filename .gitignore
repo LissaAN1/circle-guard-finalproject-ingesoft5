@@ -53,3 +53,7 @@ neo4jdata/
 *.ppk
 .aws/
 infra/.env
+
+# HU-01: local Python bootstrap/test caches
+__pycache__/
+*.pyc

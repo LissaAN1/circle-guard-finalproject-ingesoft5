@@ -69,7 +69,7 @@ bootstrap_upload "$src/compose.yaml" "$dst/compose.yaml"
 bootstrap_upload "$src/casc.yaml" "$dst/casc.yaml"
 
 # The base image is pinned. Repeated Compose up reuses the same container and volume.
-bootstrap_ssh "cd '$dst' && sudo docker compose -f compose.yaml config --quiet && sudo docker compose -f compose.yaml up -d --build"
+bootstrap_ssh "sudo sh -c 'cd \"$dst\" && docker compose -f compose.yaml config --quiet && docker compose -f compose.yaml up -d --build'"
 
 bootstrap_ssh "sudo docker compose -f '$dst/compose.yaml' ps"
 

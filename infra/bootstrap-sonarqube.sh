@@ -19,7 +19,7 @@ if ! sudo test -f "$base/sonar.secrets.env"; then
   tmp="$(mktemp)"
   trap 'rm -f "$tmp"' EXIT
   printf 'SONAR_DB_PASSWORD=%s\n' "$(openssl rand -hex 24)" > "$tmp"
-  printf 'SONAR_ADMIN_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> "$tmp"
+  printf 'SONAR_ADMIN_PASSWORD=Aa1!%s\n' "$(openssl rand -hex 24)" >> "$tmp"
   sudo install -m 0600 -o root -g root "$tmp" "$base/sonar.secrets.env"
   echo 'New SonarQube credentials generated on EC2 (values not displayed).'
 else
@@ -37,7 +37,7 @@ dst=/opt/circleguard/sonarqube
 bootstrap_upload "$src/compose.yaml" "$dst/compose.yaml"
 bootstrap_upload "$src/configure.py" "$dst/configure.py"
 
-bootstrap_ssh "cd '$dst' && sudo docker compose --env-file '$dst/sonar.secrets.env' -f compose.yaml config --quiet && sudo docker compose --env-file '$dst/sonar.secrets.env' -f compose.yaml up -d"
+bootstrap_ssh "sudo sh -c 'cd \"$dst\" && docker compose --env-file sonar.secrets.env -f compose.yaml config --quiet && docker compose --env-file sonar.secrets.env -f compose.yaml up -d'"
 bootstrap_ssh "sudo python3 '$dst/configure.py'"
-bootstrap_ssh "cd '$dst' && sudo docker compose --env-file '$dst/sonar.secrets.env' -f compose.yaml ps"
+bootstrap_ssh "sudo sh -c 'cd \"$dst\" && docker compose --env-file sonar.secrets.env -f compose.yaml ps'"
 printf 'SonarQube URL: http://%s:9000 (subject to TEC-04 Security Group)\n' "$BOOTSTRAP_TARGET_IP"

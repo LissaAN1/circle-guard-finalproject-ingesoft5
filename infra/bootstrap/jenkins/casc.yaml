@@ -1,0 +1,29 @@
+jenkins:
+  systemMessage: "CircleGuard CI/CD - HU-01 bootstrap"
+
+  # Build agents belong to HU-04; do not execute pipelines on the controller.
+  numExecutors: 0
+
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_USER}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+        - id: "${JENKINS_TEACHER_USER}"
+          password: "${JENKINS_TEACHER_PASSWORD}"
+
+  authorizationStrategy:
+    globalMatrix:
+      entries:
+        - user:
+            name: "${JENKINS_ADMIN_USER}"
+            permissions:
+              - "Overall/Administer"
+
+        - user:
+            name: "${JENKINS_TEACHER_USER}"
+            permissions:
+              - "Overall/Read"
+              - "Job/Read"
+              - "View/Read"

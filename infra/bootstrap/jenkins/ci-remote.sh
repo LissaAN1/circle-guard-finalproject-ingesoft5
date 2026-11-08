@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# HU-04: runs ON the Jenkins EC2 (uploaded and executed by infra/bootstrap-ci.sh).
-# Reads optional KEY=VALUE lines from stdin: GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD, SMEE_URL,
-# NEXUS_REGISTRY (host:port), JENKINS_PUBLIC_URL. Missing keys keep their previous value.
+# HU-04/HU-09: runs ON the Jenkins EC2 (uploaded and executed by infra/bootstrap-ci.sh).
+# Reads optional KEY=VALUE lines from stdin. Missing keys keep their previous value.
+# Accepted keys: GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD, SMEE_URL, NEXUS_REGISTRY,
+#   JENKINS_PUBLIC_URL, NOTIFY_WEBHOOK_URL, EC2_DEV_HOST, EC2_STAGE_HOST, EC2_PROD_HOST,
+#   EC2_SSH_KEY_B64 (base64-encoded PEM; enables the rollback job SSH credential).
 # Idempotent: reruns reuse the existing controller, volumes, agent secret and credentials.
 set -euo pipefail
 
@@ -31,15 +33,23 @@ set_kv() { # file key value
 declare -A IN=()
 if [[ ! -t 0 ]]; then
   while IFS='=' read -r k v; do
-    [[ "$k" =~ ^(GITHUB_TOKEN|NEXUS_PUBLISHER_PASSWORD|SMEE_URL|NEXUS_REGISTRY|JENKINS_PUBLIC_URL)$ ]] && IN[$k]="$v"
+    [[ "$k" =~ ^(GITHUB_TOKEN|NEXUS_PUBLISHER_PASSWORD|SMEE_URL|NEXUS_REGISTRY|JENKINS_PUBLIC_URL|NOTIFY_WEBHOOK_URL|EC2_DEV_HOST|EC2_STAGE_HOST|EC2_PROD_HOST|EC2_SSH_KEY_B64)$ ]] && IN[$k]="$v"
   done
 fi
 for k in GITHUB_TOKEN NEXUS_PUBLISHER_PASSWORD SMEE_URL; do
   [[ -n "${IN[$k]:-}" ]] && set_kv "$SECRETS" "$k" "${IN[$k]}"
 done
-for k in NEXUS_REGISTRY JENKINS_PUBLIC_URL; do
+for k in NEXUS_REGISTRY JENKINS_PUBLIC_URL NOTIFY_WEBHOOK_URL EC2_DEV_HOST EC2_STAGE_HOST EC2_PROD_HOST; do
   [[ -n "${IN[$k]:-}" ]] && set_kv "$ENVFILE" "$k" "${IN[$k]}"
 done
+
+# HU-09: EC2 SSH key for the rollback job (base64-encoded to survive KEY=VALUE stdin parsing)
+EC2_KEY_FILE="$DIR/ec2-key.pem"
+if [[ -n "${IN[EC2_SSH_KEY_B64]:-}" ]]; then
+  printf '%s' "${IN[EC2_SSH_KEY_B64]}" | base64 -d > "$EC2_KEY_FILE"
+  chmod 600 "$EC2_KEY_FILE"
+  echo "EC2 SSH key stored at $EC2_KEY_FILE"
+fi
 
 # 2) Build-agent access to the host Docker daemon without root
 set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
@@ -60,6 +70,12 @@ set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
     printf '          - usernamePassword:\n              scope: GLOBAL\n              id: "nexus-publisher"\n'
     printf '              username: "cg-publisher"\n              password: "${NEXUS_PUBLISHER_PASSWORD}"\n'
     printf '              description: "Nexus Docker publisher (HU-01 role circleguard-publisher)"\n'
+  fi
+  # HU-09: SSH key for rollback job (only when the key file was written above)
+  if [[ -f "$EC2_KEY_FILE" ]]; then
+    printf '          - basicSSHUserPrivateKey:\n              scope: GLOBAL\n              id: "ec2-ssh-key"\n'
+    printf '              username: "ubuntu"\n              description: "EC2 SSH key for environment rollback (HU-09)"\n'
+    printf '              privateKeySource:\n                fileOnMaster:\n                  privateKeyFile: "%s"\n' "$EC2_KEY_FILE"
   fi
 } > "$CASC_CREDS.new"
 if grep -q 'id:' "$CASC_CREDS.new"; then mv "$CASC_CREDS.new" "$CASC_CREDS"; chmod 644 "$CASC_CREDS"

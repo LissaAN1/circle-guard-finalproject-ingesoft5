@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# HU-04: deploys the CI pipeline layer on the existing Jenkins EC2 (build agent, shared library,
-# multibranch job, optional webhook relay and Nexus publishing). Idempotent; builds on HU-01.
+# HU-04/HU-09: deploys the CI pipeline layer on the existing Jenkins EC2 (build agent, shared
+# library, multibranch job, rollback job, optional webhook relay and Nexus publishing).
+# Idempotent; builds on HU-01.
 #
 # Usage:  bash infra/bootstrap-ci.sh
 # Optional environment (secrets travel over SSH stdin, never as arguments or files in Git):
@@ -8,6 +9,11 @@
 #   NEXUS_REGISTRY            Nexus Docker registry as <private-ip>:8082 (enables publishing from dev/main)
 #   NEXUS_PUBLISHER_PASSWORD  password of the Nexus user cg-publisher (read it on the Nexus EC2)
 #   SMEE_URL                  smee.io channel URL used as webhook relay
+#   NOTIFY_WEBHOOK_URL        Slack-compatible webhook URL for failure notifications (HU-09)
+#   EC2_DEV_HOST              public IP of circleguard-dev (enables rollback job without TARGET_HOST param)
+#   EC2_STAGE_HOST            public IP of circleguard-stage
+#   EC2_PROD_HOST             public IP of circleguard-prod
+#   EC2_SSH_KEY_B64           base64-encoded EC2 SSH private key (enables rollback SSH credential)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bootstrap-common.sh
@@ -41,7 +47,16 @@ bootstrap_upload "$src/ci-remote.sh" "$dst/ci-remote.sh"
   [[ -z "${GITHUB_TOKEN:-}" ]]             || printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
   [[ -z "${NEXUS_PUBLISHER_PASSWORD:-}" ]] || printf 'NEXUS_PUBLISHER_PASSWORD=%s\n' "$NEXUS_PUBLISHER_PASSWORD"
   [[ -z "${SMEE_URL:-}" ]]                 || printf 'SMEE_URL=%s\n' "$SMEE_URL"
+  [[ -z "${NOTIFY_WEBHOOK_URL:-}" ]]       || printf 'NOTIFY_WEBHOOK_URL=%s\n' "$NOTIFY_WEBHOOK_URL"
+  [[ -z "${EC2_DEV_HOST:-}" ]]             || printf 'EC2_DEV_HOST=%s\n' "$EC2_DEV_HOST"
+  [[ -z "${EC2_STAGE_HOST:-}" ]]           || printf 'EC2_STAGE_HOST=%s\n' "$EC2_STAGE_HOST"
+  [[ -z "${EC2_PROD_HOST:-}" ]]            || printf 'EC2_PROD_HOST=%s\n' "$EC2_PROD_HOST"
+  if [[ -n "${EC2_SSH_KEY_B64:-}" ]]; then
+    printf 'EC2_SSH_KEY_B64=%s\n' "$EC2_SSH_KEY_B64"
+  elif [[ -n "${EC2_SSH_KEY_FILE:-}" && -r "${EC2_SSH_KEY_FILE}" ]]; then
+    printf 'EC2_SSH_KEY_B64=%s\n' "$(base64 -w0 < "$EC2_SSH_KEY_FILE")"
+  fi
 } | bootstrap_ssh "sudo bash '$dst/ci-remote.sh'"
 
-printf '\nJenkins: http://%s:8080  (job: circleguard; node: build-agent)\n' "$BOOTSTRAP_TARGET_IP"
+printf '\nJenkins: http://%s:8080  (jobs: circleguard, circleguard-rollback; node: build-agent)\n' "$BOOTSTRAP_TARGET_IP"
 printf 'Check the agent is online and run a scan; see docs/operaciones/hu-04-pipeline-ci.md\n'

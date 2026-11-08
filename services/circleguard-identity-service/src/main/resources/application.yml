@@ -26,3 +26,12 @@ jwt:
 
 server:
   port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never

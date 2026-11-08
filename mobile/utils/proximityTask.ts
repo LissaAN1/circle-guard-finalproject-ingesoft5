@@ -3,9 +3,9 @@ import * as TaskManager from 'expo-task-manager';
 import * as BackgroundFetch from 'expo-background-fetch';
 import * as SecureStore from 'expo-secure-store';
 import { ProximityScanner } from './proximityScanner';
+import { PROMOTION_BASE_URL } from '../constants/Config';
 
 export const PROXIMITY_SYNC_TASK = 'PROXIMITY_SYNC_TASK';
-const PROMOTION_BASE_URL = 'http://localhost:8088'; // Promotion Service
 
 /**
  * Registry for the periodic background encounter sync.
@@ -14,7 +14,7 @@ const PROMOTION_BASE_URL = 'http://localhost:8088'; // Promotion Service
 TaskManager.defineTask(PROXIMITY_SYNC_TASK, async () => {
     try {
         console.log('[Task] PROXIMITY_SYNC_TASK started...');
-        
+
         // 1. Get current user's anonymousId
         const myAnonymousId = await SecureStore.getItemAsync('user_anonymous_id');
         if (!myAnonymousId) {
@@ -67,7 +67,7 @@ export const registerProximityTask = async () => {
         await BackgroundFetch.registerTaskAsync(PROXIMITY_SYNC_TASK, {
             minimumInterval: 60 * 15, // 15 minutes
             stopOnTerminate: false,    // Stay alive after app close
-            startOnBoot: true,        // Restart on device reboot
+            startOnBoot: true,         // Restart on device reboot
         });
         console.log('[Task] Registration successful.');
     } catch (err) {

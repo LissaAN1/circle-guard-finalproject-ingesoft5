@@ -57,3 +57,7 @@ infra/.env
 # HU-01: local Python bootstrap/test caches
 __pycache__/
 *.pyc
+
+# HU-02: private per-environment configuration
+infra/environments/.env.*
+!infra/environments/.env.example

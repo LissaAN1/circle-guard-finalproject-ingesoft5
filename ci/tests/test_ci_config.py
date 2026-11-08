@@ -47,6 +47,13 @@ class JenkinsConfigTests(unittest.TestCase):
         self.assertIn("buildOriginPRMerge(true)", script)
         self.assertNotIn("password", script.lower())
 
+    def test_scan_uses_username_password_credential(self):
+        # GitHub Branch Source ignores Secret text credentials (anonymous scan, 60 calls/hour)
+        script = self.casc["jobs"][0]["script"]
+        self.assertIn("scanCredentialsId('github-scan')", script)
+        remote = (JENKINS / "ci-remote.sh").read_text(encoding="utf8")
+        self.assertRegex(remote, r'usernamePassword:[^\n]*\\n[^\n]*\\n[^\n]*id: "github-scan"')
+
     def test_no_secret_values_in_casc(self):
         text = (JENKINS / "casc.d" / "10-ci.yaml").read_text(encoding="utf8")
         self.assertNotRegex(text, r"ghp_[A-Za-z0-9]+")
@@ -94,6 +101,10 @@ class SharedLibraryTests(unittest.TestCase):
                 text = re.sub(r"//.*", "", f.read_text(encoding="utf8"))
                 self.assertEqual(text.count("{"), text.count("}"))
                 self.assertEqual(text.count("("), text.count(")"))
+
+    def test_checkout_exports_git_commit(self):
+        text = (VARS / "cgCheckout.groovy").read_text(encoding="utf8")
+        self.assertIn("env.GIT_COMMIT", text)
 
     def test_latest_tag_is_never_used(self):
         for f in list(VARS.glob("*.groovy")) + [ROOT / "Jenkinsfile"] + list((ROOT / "ci" / "scripts").glob("*.sh")):

@@ -49,7 +49,12 @@ set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
   printf 'credentials:\n  system:\n    domainCredentials:\n      - credentials:\n'
   if [[ -n "$(get "$SECRETS" GITHUB_TOKEN)" ]]; then
     printf '          - string:\n              scope: GLOBAL\n              id: "github-token"\n'
-    printf '              secret: "${GITHUB_TOKEN}"\n              description: "GitHub token (scan, commit status, webhooks)"\n'
+    printf '              secret: "${GITHUB_TOKEN}"\n              description: "GitHub token as secret text (commit status from pipeline steps)"\n'
+    # GitHub Branch Source ignores Secret text and scans anonymously (60 calls/hour); it needs a
+    # username/password credential whose password is the token.
+    printf '          - usernamePassword:\n              scope: GLOBAL\n              id: "github-scan"\n'
+    printf '              username: "DanielTRUJILLO2"\n              password: "${GITHUB_TOKEN}"\n'
+    printf '              description: "GitHub token for the multibranch scan and webhooks"\n'
   fi
   if [[ -n "$(get "$SECRETS" NEXUS_PUBLISHER_PASSWORD)" ]]; then
     printf '          - usernamePassword:\n              scope: GLOBAL\n              id: "nexus-publisher"\n'

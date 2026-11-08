@@ -56,7 +56,7 @@ jobs:
             id('circleguard-github')
             repoOwner('LissaAN1')
             repository('circle-guard-finalproject-ingesoft5')
-            scanCredentialsId('github-token')
+            scanCredentialsId('github-scan')
             buildOriginBranch(true)
             buildOriginBranchWithPR(false)
             buildOriginPRMerge(true)

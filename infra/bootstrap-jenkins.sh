@@ -67,6 +67,9 @@ dst=/opt/circleguard/jenkins
 bootstrap_upload "$src/Dockerfile" "$dst/Dockerfile"
 bootstrap_upload "$src/compose.yaml" "$dst/compose.yaml"
 bootstrap_upload "$src/casc.yaml" "$dst/casc.yaml"
+# HU-04 files referenced by compose.yaml (casc.d mount and the build-agent image context)
+bootstrap_upload "$src/casc.d/10-ci.yaml" "$dst/casc.d/10-ci.yaml"
+bootstrap_upload "$src/agent/Dockerfile" "$dst/agent/Dockerfile"
 
 # The base image is pinned. Repeated Compose up reuses the same container and volume.
 bootstrap_ssh "sudo sh -c 'cd \"$dst\" && docker compose -f compose.yaml config --quiet && docker compose -f compose.yaml up -d --build'"

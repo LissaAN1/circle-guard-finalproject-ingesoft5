@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: circleguard/jenkins-bootstrap:1.0.0
+    image: circleguard/jenkins-bootstrap:1.1.0
     container_name: circleguard-jenkins
     restart: unless-stopped
 
@@ -14,14 +14,21 @@ services:
 
     env_file:
       - /opt/circleguard/jenkins/jenkins.secrets.env
+      # HU-04 optional secrets (GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD); written by bootstrap-ci.sh
+      - path: /opt/circleguard/jenkins/ci.secrets.env
+        required: false
 
     environment:
-      CASC_JENKINS_CONFIG: /etc/jenkins/casc.yaml
-      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+      # HU-01 base config plus the HU-04 files under casc.d (nodes, library, multibranch job)
+      CASC_JENKINS_CONFIG: /etc/jenkins/casc.yaml,/etc/jenkins/casc.d
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx1g
+      JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:-http://localhost:8080/}
+      NEXUS_REGISTRY: ${NEXUS_REGISTRY:-}
 
     volumes:
       - jenkins_home:/var/jenkins_home
       - ./casc.yaml:/etc/jenkins/casc.yaml:ro
+      - ./casc.d:/etc/jenkins/casc.d:ro
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login >/dev/null || exit 1"]
@@ -30,6 +37,52 @@ services:
       start_period: 120s
       retries: 12
 
+  # HU-04: the only place where pipelines execute. Enabled with `--profile ci`.
+  build-agent:
+    profiles: ["ci"]
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    image: circleguard/jenkins-build-agent:1.0.0
+    container_name: circleguard-build-agent
+    restart: unless-stopped
+    depends_on:
+      jenkins:
+        condition: service_healthy
+    # Docker socket access without running as root: the host's docker GID is written to .env
+    group_add:
+      - "${DOCKER_GID:-999}"
+    env_file:
+      # JENKINS_SECRET=<inbound agent secret>; fetched from the controller by bootstrap-ci.sh
+      - path: /opt/circleguard/jenkins/agent.secrets.env
+        required: false
+    environment:
+      JENKINS_URL: http://jenkins:8080
+      JENKINS_AGENT_NAME: build-agent
+      JENKINS_WEB_SOCKET: "true"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - agent_work:/home/jenkins/agent
+      - gradle_cache:/home/jenkins/.gradle
+
+  # HU-04 optional: relays GitHub webhooks through smee.io so port 8080 stays closed to the internet.
+  webhook-relay:
+    profiles: ["webhook"]
+    image: node:20-alpine
+    container_name: circleguard-webhook-relay
+    restart: unless-stopped
+    depends_on:
+      jenkins:
+        condition: service_healthy
+    env_file:
+      - path: /opt/circleguard/jenkins/ci.secrets.env
+        required: false
+    command: ["sh", "-c", "npx --yes smee-client@2.0.4 -u \"$$SMEE_URL\" -t http://jenkins:8080/github-webhook/"]
+
 volumes:
   jenkins_home:
     name: circleguard_jenkins_home
+  agent_work:
+    name: circleguard_agent_work
+  gradle_cache:
+    name: circleguard_gradle_cache

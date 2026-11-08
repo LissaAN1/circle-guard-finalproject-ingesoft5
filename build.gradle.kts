@@ -27,6 +27,7 @@ subprojects {
     dependencies {
         "implementation"(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
         "testImplementation"(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
+        "testImplementation"(platform("org.testcontainers:testcontainers-bom:1.21.3"))
         "compileOnly"("org.projectlombok:lombok")
         "annotationProcessor"("org.projectlombok:lombok")
         "testCompileOnly"("org.projectlombok:lombok")
@@ -43,7 +44,18 @@ subprojects {
         }
     }
 
-    tasks.withType<Test> {
-        useJUnitPlatform()
+    tasks.named<Test>("test") {
+        useJUnitPlatform { excludeTags("integration") }
+    }
+
+    val integrationTest by tasks.registering(Test::class) {
+        group = "verification"
+        description = "Pruebas de integracion con Testcontainers (requiere Docker)."
+        val testSourceSet = project.extensions.getByType<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+        useJUnitPlatform { includeTags("integration") }
+        shouldRunAfter(tasks.named("test"))
+        maxParallelForks = 1
     }
 }

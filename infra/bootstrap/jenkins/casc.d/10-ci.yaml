@@ -31,9 +31,9 @@ unclassified:
         implicit: false
         allowVersionOverride: true
         includeInChangesets: false
-        libraryPath: "ci/shared-library/"
         retriever:
           modernSCM:
+            libraryPath: "ci/shared-library/"
             scm:
               github:
                 id: "circleguard-ci-library"
@@ -56,7 +56,6 @@ jobs:
             id('circleguard-github')
             repoOwner('LissaAN1')
             repository('circle-guard-finalproject-ingesoft5')
-            repositoryUrl('https://github.com/LissaAN1/circle-guard-finalproject-ingesoft5')
             scanCredentialsId('github-token')
             buildOriginBranch(true)
             buildOriginBranchWithPR(false)

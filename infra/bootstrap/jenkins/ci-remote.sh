@@ -13,7 +13,9 @@ CASC_CREDS="$DIR/casc.d/20-credentials.yaml"
 COMPOSE=(docker compose -f "$DIR/compose.yaml")
 
 [[ "$(id -u)" -eq 0 ]] || { echo 'ERROR: run as root (sudo)' >&2; exit 1; }
-install -d -m 0750 "$DIR" "$DIR/casc.d"
+install -d -m 0750 "$DIR"
+# casc.d is bind-mounted and read by the non-root jenkins user; it holds no secrets (only ${VAR} refs)
+install -d -m 0755 "$DIR/casc.d"
 touch "$SECRETS" "$ENVFILE"; chmod 600 "$SECRETS"; chmod 644 "$ENVFILE"
 
 # get/set KEY=VALUE in a file without printing values
@@ -103,20 +105,29 @@ docker run -d --name "$probe" --memory 900m \
 verdict=timeout
 for _ in $(seq 1 40); do
   logs="$(docker logs "$probe" 2>&1 || true)"
-  if grep -q 'ConfiguratorException' <<<"$logs"; then verdict=invalid; break; fi
+  if grep -qE 'ConfiguratorException|Failed ConfigurationAsCode.init|BootFailure' <<<"$logs"; then verdict=invalid; break; fi
   if grep -q 'Jenkins is fully up and running' <<<"$logs"; then verdict=valid; break; fi
   sleep 5
 done
 if [[ "$verdict" != valid ]]; then
   echo "ERROR: pre-flight verdict=$verdict; production Jenkins was NOT touched. Relevant log lines:" >&2
-  docker logs "$probe" 2>&1 | grep -E 'ConfiguratorException|WARNING|SEVERE|Caused by' | head -n 25 >&2 || true
+  docker logs "$probe" 2>&1 | grep -E 'Exception|SEVERE|Available attributes|Caused' | cut -c1-300 | head -n 25 >&2 || true
   docker rm -f "$probe" >/dev/null 2>&1 || true
   exit 1
 fi
 docker rm -f "$probe" >/dev/null 2>&1 || true
 echo 'Pre-flight OK.'
 
-"${COMPOSE[@]}" up -d jenkins
+# JCasC reads credentials only at boot and they live in bind-mounted files, so Compose would not
+# notice a change: recreate the controller (the volume keeps all data) only when they changed.
+cred_hash="$(cat "$SECRETS" "$CASC_CREDS" "$ENVFILE" 2>/dev/null | sha256sum | cut -d' ' -f1)"
+recreate=()
+if [[ "$(cat "$DIR/.cred.hash" 2>/dev/null || true)" != "$cred_hash" ]]; then
+  echo 'Credentials or CI environment changed: recreating the controller'
+  recreate=(--force-recreate)
+fi
+"${COMPOSE[@]}" up -d "${recreate[@]}" jenkins
+printf '%s\n' "$cred_hash" > "$DIR/.cred.hash"
 echo 'Waiting for the controller to be healthy...'
 for _ in $(seq 1 60); do
   [[ "$(docker inspect -f '{{.State.Health.Status}}' circleguard-jenkins 2>/dev/null)" == healthy ]] && break

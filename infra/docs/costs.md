@@ -48,3 +48,34 @@ infra/teardown.sh --yes        # DESTROYS servers and security groups (end of pr
   URLs after a restart, or move to Elastic IPs (0.005 USD/h each) later.
 * A monthly budget with e-mail alerts at 50/80/100 % is created by
   `infra/create-budget.sh <email> [usd]`.
+
+---
+
+## Actualización de capacidad y estimación — HU-02 (2026-11-08)
+
+Esta sección **complementa y conserva** la estimación original de TEC-04 anterior. Durante la validación real de HU-02 se amplió `dev`, `stage` y `prod` de `t3.small` (2 GiB) a `m7i-flex.large` (8 GiB), porque la pila de doce contenedores requiere más memoria. Los tres servidores de CI/CD mantienen `c7i-flex.large` (4 GiB). No se crearon instancias adicionales.
+
+Los siguientes valores son **estimaciones de tarifa pública Linux On-Demand en us-east-1**, no cargos reales ni promesa de gratuidad; verificar precios finales, descuentos/créditos y facturación en AWS Billing/Pricing Calculator. Se conserva el supuesto histórico de seis IPv4 públicas facturadas solamente durante las horas encendidas, a USD 0.005/h cada una, y EBS gp3 por 200 GiB a USD 0.08/GiB-mes.
+
+| Concepto | Precio USD/h | Cantidad | Total USD/h |
+|:---|---:|---:|---:|
+| EC2 `c7i-flex.large` — Jenkins, SonarQube, Nexus | 0.0848 | 3 | 0.2544 |
+| EC2 `m7i-flex.large` — dev, stage, prod | 0.0958 | 3 | 0.2874 |
+| IPv4 públicas (supuesto histórico) | 0.0050 | 6 | 0.0300 |
+| **Total con las seis EC2 encendidas** | | | **0.5718** |
+
+| Escenario de referencia | Horas por instancia/mes | Compute + IPv4 (USD) | EBS (USD) | Total estimado (USD/mes) |
+|:---|---:|---:|---:|---:|
+| Seis instancias encendidas 24/7 | 720 | 411.70 | 16.00 | **427.70** |
+| Seis instancias encendidas 8 h × 22 días | 176 | 100.64 | 16.00 | **116.64** |
+| Todas las EC2 detenidas | 0 | 0.00 | 16.00 | **16.00** |
+
+**Comparación histórica:** la estimación original de TEC-04 era USD 0.3468/h con tres `t3.small`; la nueva estimación es USD 0.5718/h, una diferencia de **USD 0.2250/h** (+64.9 %), cuando las seis instancias y seis IPv4 están en uso. Los importes históricos se mantienen arriba para permitir auditoría de la decisión de ampliación.
+
+**Alcance de los importes:** estimación de EC2, IPv4 pública y EBS base. No incluyen transferencia de datos, snapshots, impuestos, eventuales EBS adicionales, otros recursos ni diferencias de facturación por IP. El volumen real de discos debe corroborarse contra AWS. El escenario "detenido" supone que no existen Elastic IPs u otras IPv4 públicas retenidas con cargos adicionales.
+
+**Ejecución HU-02 (2026-11-08):** despliegues reales en dev, stage y prod con aplicaciones saludables y las mismas seis imágenes publicadas en Nexus; instancias ampliadas a `m7i-flex.large`. El costo real de las horas utilizadas se debe tomar de AWS Billing/Cost Explorer, no estimarse como consumo efectivamente facturado.
+
+**Control de gastos:** detener `dev`, `stage`, `prod` y `nexus` al finalizar el trabajo, coordinando con el equipo. Jenkins y SonarQube se mantienen detenidas cuando no se usan. EBS permanece y se factura aun con EC2 detenida. La restauración de instancias puede cambiar sus IP públicas; Nexus mantiene su IP privada dentro de la VPC mientras conserve la interfaz correspondiente.
+
+**Referencias consultadas:** AWS Pricing Calculator (https://calculator.aws/); precios públicos de `m7i-flex.large` en us-east-1 (https://www.economize.cloud/resources/aws/pricing/ec2/m7i-flex.large/) y de `c7i-flex.large` (https://www.economize.cloud/resources/aws/pricing/ec2/c7i-flex.large/). Consulta del 2026-11-08.

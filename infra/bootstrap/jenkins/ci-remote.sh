@@ -19,6 +19,10 @@ install -d -m 0750 "$DIR"
 # casc.d is bind-mounted and read by the non-root jenkins user; it holds no secrets (only ${VAR} refs)
 install -d -m 0755 "$DIR/casc.d"
 touch "$SECRETS" "$ENVFILE"; chmod 600 "$SECRETS"; chmod 644 "$ENVFILE"
+# HU-09: ec2-key.pem must exist before compose starts (bind mount source). Placeholder is empty
+# until EC2_SSH_KEY_B64 is provided; chown 1000 so the jenkins user inside the container can read it.
+EC2_KEY_FILE="$DIR/ec2-key.pem"
+[[ -f "$EC2_KEY_FILE" ]] || install -m 0400 -o 1000 -g 1000 /dev/null "$EC2_KEY_FILE"
 
 # get/set KEY=VALUE in a file without printing values
 get() { sed -n "s/^$2=//p" "$1" | tail -n1; }
@@ -43,12 +47,12 @@ for k in NEXUS_REGISTRY JENKINS_PUBLIC_URL NOTIFY_WEBHOOK_URL EC2_DEV_HOST EC2_S
   [[ -n "${IN[$k]:-}" ]] && set_kv "$ENVFILE" "$k" "${IN[$k]}"
 done
 
-# HU-09: EC2 SSH key for the rollback job (base64-encoded to survive KEY=VALUE stdin parsing)
-EC2_KEY_FILE="$DIR/ec2-key.pem"
+# HU-09: EC2 SSH key (base64-encoded to survive KEY=VALUE stdin). Written to the host path that is
+# bind-mounted into the container at /run/secrets/ec2-key.pem; owned by jenkins uid 1000 (0400).
 if [[ -n "${IN[EC2_SSH_KEY_B64]:-}" ]]; then
   printf '%s' "${IN[EC2_SSH_KEY_B64]}" | base64 -d > "$EC2_KEY_FILE"
-  chmod 600 "$EC2_KEY_FILE"
-  echo "EC2 SSH key stored at $EC2_KEY_FILE"
+  chown 1000:1000 "$EC2_KEY_FILE"; chmod 0400 "$EC2_KEY_FILE"
+  echo "EC2 SSH key stored at $EC2_KEY_FILE (uid 1000, 0400)"
 fi
 
 # 2) Build-agent access to the host Docker daemon without root
@@ -71,11 +75,12 @@ set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
     printf '              username: "cg-publisher"\n              password: "${NEXUS_PUBLISHER_PASSWORD}"\n'
     printf '              description: "Nexus Docker publisher (HU-01 role circleguard-publisher)"\n'
   fi
-  # HU-09: SSH key for rollback job (only when the key file was written above)
-  if [[ -f "$EC2_KEY_FILE" ]]; then
+  # HU-09: SSH key for rollback job. Use the container-side mount path, not the host path.
+  # -s checks the file is non-empty (placeholder is empty until EC2_SSH_KEY_B64 is provided).
+  if [[ -s "$EC2_KEY_FILE" ]]; then
     printf '          - basicSSHUserPrivateKey:\n              scope: GLOBAL\n              id: "ec2-ssh-key"\n'
     printf '              username: "ubuntu"\n              description: "EC2 SSH key for environment rollback (HU-09)"\n'
-    printf '              privateKeySource:\n                fileOnMaster:\n                  privateKeyFile: "%s"\n' "$EC2_KEY_FILE"
+    printf '              privateKeySource:\n                fileOnMaster:\n                  privateKeyFile: "/run/secrets/ec2-key.pem"\n'
   fi
 } > "$CASC_CREDS.new"
 if grep -q 'id:' "$CASC_CREDS.new"; then mv "$CASC_CREDS.new" "$CASC_CREDS"; chmod 644 "$CASC_CREDS"

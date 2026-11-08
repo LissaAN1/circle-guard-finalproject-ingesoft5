@@ -24,11 +24,19 @@ services:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx1g
       JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:-http://localhost:8080/}
       NEXUS_REGISTRY: ${NEXUS_REGISTRY:-}
+      # HU-09: resolved from .env at compose startup so JCasC can interpolate them at boot
+      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      EC2_DEV_HOST: ${EC2_DEV_HOST:-}
+      EC2_STAGE_HOST: ${EC2_STAGE_HOST:-}
+      EC2_PROD_HOST: ${EC2_PROD_HOST:-}
 
     volumes:
       - jenkins_home:/var/jenkins_home
       - ./casc.yaml:/etc/jenkins/casc.yaml:ro
       - ./casc.d:/etc/jenkins/casc.d:ro
+      # HU-09: EC2 SSH key for the rollback job. Placeholder created by ci-remote.sh; populated
+      # when EC2_SSH_KEY_B64 is provided at bootstrap time. Mounted read-only for the jenkins user.
+      - /opt/circleguard/jenkins/ec2-key.pem:/run/secrets/ec2-key.pem:ro
 
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/login >/dev/null || exit 1"]

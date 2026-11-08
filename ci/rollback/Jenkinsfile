@@ -41,6 +41,10 @@ pipeline {
                     if (!params.APP_VERSION?.trim()) {
                         error 'APP_VERSION is required'
                     }
+                    // Validate before interpolating into the SSH command to prevent injection.
+                    if (!(params.APP_VERSION ==~ /^[0-9A-Za-z][0-9A-Za-z._+\-]{0,127}$/)) {
+                        error "APP_VERSION '${params.APP_VERSION}' contains invalid characters"
+                    }
                     String envName = params.ENVIRONMENT
                     String host    = params.TARGET_HOST?.trim() ?: env["EC2_${envName.toUpperCase()}_HOST"]?.trim()
                     if (!host) {

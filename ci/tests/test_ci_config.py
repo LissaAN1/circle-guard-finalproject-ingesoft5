@@ -34,8 +34,11 @@ class JenkinsConfigTests(unittest.TestCase):
     def test_shared_library_points_to_repo_path(self):
         lib = self.casc["unclassified"]["globalLibraries"]["libraries"][0]
         self.assertEqual(lib["name"], "circleguard-ci")
-        self.assertEqual(lib["libraryPath"], "ci/shared-library/")
-        self.assertTrue((ROOT / lib["libraryPath"] / "vars").is_dir())
+        # libraryPath belongs to the retriever (SCMSourceRetriever), not to LibraryConfiguration
+        self.assertNotIn("libraryPath", lib)
+        path = lib["retriever"]["modernSCM"]["libraryPath"]
+        self.assertEqual(path, "ci/shared-library/")
+        self.assertTrue((ROOT / path / "vars").is_dir())
 
     def test_multibranch_job_reads_root_jenkinsfile(self):
         script = self.casc["jobs"][0]["script"]

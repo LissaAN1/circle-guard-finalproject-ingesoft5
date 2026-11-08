@@ -1,5 +1,6 @@
-// HU-04: multibranch CI pipeline for the 8 services and the web client.
+// HU-04/HU-09: multibranch CI pipeline for the 8 services and the web client.
 // Stages: checkout, change detection, build, test, analysis (optional), package, publish.
+// Failure/unstable builds trigger cgNotify (GitHub commit status + optional webhook).
 def call() {
     pipeline {
         agent { label 'docker' }
@@ -47,6 +48,12 @@ def call() {
 
         post {
             always {
+                script {
+                    // HU-09: notify before workspace is wiped so cgNotify can still run sh steps.
+                    if (currentBuild.currentResult in ['FAILURE', 'UNSTABLE']) {
+                        cgNotify(currentBuild.currentResult)
+                    }
+                }
                 sh 'docker image prune -f --filter "until=24h" || true'
                 cleanWs(notFailBuild: true)
             }

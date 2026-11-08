@@ -1,4 +1,4 @@
-# HU-04: build agent, shared library and the multibranch pipeline job.
+# HU-04/HU-09: build agent, shared library, the multibranch pipeline job, and the rollback job.
 # Loaded together with ../casc.yaml (HU-01). Secrets arrive as environment variables only.
 jenkins:
   # Pipelines never run on the controller (numExecutors: 0 in casc.yaml); they run on this node.
@@ -19,6 +19,16 @@ jenkins:
           # Empty NEXUS_REGISTRY disables publishing (the pipeline reports it and moves on).
           - key: "NEXUS_REGISTRY"
             value: "${NEXUS_REGISTRY:-}"
+          # HU-09: optional webhook for failure notifications (Slack-compatible).
+          - key: "NOTIFY_WEBHOOK_URL"
+            value: "${NOTIFY_WEBHOOK_URL:-}"
+          # HU-09: EC2 public IPs for the rollback job. Set at bootstrap-ci time.
+          - key: "EC2_DEV_HOST"
+            value: "${EC2_DEV_HOST:-}"
+          - key: "EC2_STAGE_HOST"
+            value: "${EC2_STAGE_HOST:-}"
+          - key: "EC2_PROD_HOST"
+            value: "${EC2_PROD_HOST:-}"
 
 unclassified:
   location:
@@ -78,4 +88,30 @@ jobs:
             interval('10m')
           }
         }
+      }
+
+      // HU-09: parametrized rollback job.
+      pipelineJob('circleguard-rollback') {
+        displayName('CircleGuard Rollback')
+        description('HU-09: redeploy a specific image version to dev, stage or prod.')
+        parameters {
+          choiceParam('ENVIRONMENT', ['dev', 'stage', 'prod'], 'Target environment')
+          stringParam('APP_VERSION', '', 'Version tag to redeploy, e.g. 1.0.0 or 1.0.0-ci.12.ab12cd3')
+          stringParam('TARGET_HOST', '', 'EC2 public IP (leave blank to use EC2_<ENV>_HOST global env var)')
+        }
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/LissaAN1/circle-guard-finalproject-ingesoft5')
+                  credentials('github-token')
+                }
+                branch('*/dev')
+              }
+            }
+            scriptPath('ci/rollback/Jenkinsfile')
+          }
+        }
+        logRotator(-1, 20, -1, -1)
       }

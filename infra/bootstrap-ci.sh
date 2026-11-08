@@ -9,7 +9,7 @@
 #   NEXUS_REGISTRY            Nexus Docker registry as <private-ip>:8082 (enables publishing from dev/main)
 #   NEXUS_PUBLISHER_PASSWORD  password of the Nexus user cg-publisher (read it on the Nexus EC2)
 #   SMEE_URL                  smee.io channel URL used as webhook relay
-#   NOTIFY_WEBHOOK_URL        Slack-compatible webhook URL for failure notifications (HU-09)
+#   NOTIFY_WEBHOOK_URL        Slack-compatible webhook URL for failure notifications (HU-09, stored as secret)
 #   EC2_DEV_HOST              public IP of circleguard-dev (enables rollback job without TARGET_HOST param)
 #   EC2_STAGE_HOST            public IP of circleguard-stage
 #   EC2_PROD_HOST             public IP of circleguard-prod

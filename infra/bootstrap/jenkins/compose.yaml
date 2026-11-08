@@ -24,8 +24,7 @@ services:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx1g
       JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:-http://localhost:8080/}
       NEXUS_REGISTRY: ${NEXUS_REGISTRY:-}
-      # HU-09: resolved from .env at compose startup so JCasC can interpolate them at boot
-      NOTIFY_WEBHOOK_URL: ${NOTIFY_WEBHOOK_URL:-}
+      # HU-09: EC2 host IPs resolved from .env; NOTIFY_WEBHOOK_URL comes from ci.secrets.env (env_file)
       EC2_DEV_HOST: ${EC2_DEV_HOST:-}
       EC2_STAGE_HOST: ${EC2_STAGE_HOST:-}
       EC2_PROD_HOST: ${EC2_PROD_HOST:-}

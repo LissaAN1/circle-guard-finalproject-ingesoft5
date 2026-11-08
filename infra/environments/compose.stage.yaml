@@ -1,0 +1,5 @@
+name: circleguard-stage
+services:
+  web:
+    labels:
+      com.circleguard.environment: stage

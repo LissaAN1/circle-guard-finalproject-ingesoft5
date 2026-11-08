@@ -53,3 +53,11 @@ neo4jdata/
 *.ppk
 .aws/
 infra/.env
+
+
+
+
+
+# HU-02: private per-environment configuration
+infra/environments/.env.*
+!infra/environments/.env.example

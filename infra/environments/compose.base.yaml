@@ -1,0 +1,236 @@
+# HU-02. Images are published once by HU-03; never build on environment EC2s.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${DB_USER:?DB_USER required}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/01-init-db.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d postgres"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  neo4j:
+    image: neo4j:5.26
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD required}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?NEO4J_PASSWORD required}
+      NEO4J_PLUGINS: '["apoc"]'
+    volumes:
+      - neo4jdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -a bolt://localhost:7687 -u neo4j -p \"$$NEO4J_PASSWORD\" 'RETURN 1' >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 15s
+      start_period: 120s
+      retries: 12
+    restart: unless-stopped
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: "2181"
+      ZOOKEEPER_TICK_TIME: "2000"
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    depends_on:
+      zookeeper:
+        condition: service_started
+    environment:
+      KAFKA_BROKER_ID: "1"
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: INTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 30s
+      timeout: 15s
+      start_period: 90s
+      retries: 12
+    restart: unless-stopped
+
+  redis:
+    image: redis:7.2
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+    command: ["sh", "-c", "exec redis-server --appendonly yes --requirepass \"$$REDIS_PASSWORD\""]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep -q PONG"]
+      interval: 15s
+      timeout: 5s
+      retries: 12
+    restart: unless-stopped
+
+  openldap:
+    image: osixia/openldap:1.5.0
+    environment:
+      LDAP_ORGANISATION: CircleGuard
+      LDAP_DOMAIN: circleguard.edu
+      LDAP_ADMIN_PASSWORD: ${LDAP_ADMIN_PASSWORD:?LDAP_ADMIN_PASSWORD required}
+    volumes:
+      - ldapdata:/var/lib/ldap
+      - ldapconfig:/etc/ldap/slapd.d
+    restart: unless-stopped
+
+  auth:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-auth-service:${APP_VERSION:?APP_VERSION required}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/circleguard_auth
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?DB_USER required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      SPRING_LDAP_URLS: ldap://openldap:389
+      SPRING_LDAP_BASE: dc=circleguard,dc=edu
+      SPRING_LDAP_USERNAME: cn=admin,dc=circleguard,dc=edu
+      SPRING_LDAP_PASSWORD: ${LDAP_ADMIN_PASSWORD:?LDAP_ADMIN_PASSWORD required}
+      IDENTITY_API_URL: http://identity:8083
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      QR_SECRET: ${QR_SECRET:?QR_SECRET required}
+    depends_on:
+      postgres: {condition: service_healthy}
+      openldap: {condition: service_started}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8180/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 8s
+      start_period: 120s
+      retries: 12
+    restart: unless-stopped
+
+  identity:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-identity-service:${APP_VERSION:?APP_VERSION required}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/circleguard_identity
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?DB_USER required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      VAULT_SECRET: ${VAULT_SECRET:?VAULT_SECRET required}
+      VAULT_SALT: ${VAULT_SALT:?VAULT_SALT required}
+      VAULT_HASH_SALT: ${VAULT_HASH_SALT:?VAULT_HASH_SALT required}
+    depends_on:
+      postgres: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8083/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 8s
+      start_period: 120s
+      retries: 12
+    restart: unless-stopped
+
+  promotion:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-promotion-service:${APP_VERSION:?APP_VERSION required}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/circleguard_promotion
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?DB_USER required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      SPRING_NEO4J_URI: bolt://neo4j:7687
+      SPRING_NEO4J_AUTHENTICATION_USERNAME: neo4j
+      SPRING_NEO4J_AUTHENTICATION_PASSWORD: ${NEO4J_PASSWORD:?NEO4J_PASSWORD required}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:?NEO4J_PASSWORD required}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+    depends_on:
+      postgres: {condition: service_healthy}
+      neo4j: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8088/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 8s
+      start_period: 180s
+      retries: 12
+    restart: unless-stopped
+
+  form:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-form-service:${APP_VERSION:?APP_VERSION required}
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/circleguard_form
+      SPRING_DATASOURCE_USERNAME: ${DB_USER:?DB_USER required}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD required}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      postgres: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8086/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 8s
+      start_period: 120s
+      retries: 12
+    restart: unless-stopped
+
+  gateway:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-gateway-service:${APP_VERSION:?APP_VERSION required}
+    environment:
+      SPRING_DATA_REDIS_HOST: redis
+      SPRING_DATA_REDIS_PORT: "6379"
+      SPRING_DATA_REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?REDIS_PASSWORD required}
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET required}
+      QR_SECRET: ${QR_SECRET:?QR_SECRET required}
+    depends_on:
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8087/actuator/health | grep -q '\"status\":\"UP\"'"]
+      interval: 20s
+      timeout: 8s
+      start_period: 120s
+      retries: 12
+    restart: unless-stopped
+
+  web:
+    image: ${REGISTRY:?REGISTRY required}/circleguard/circleguard-web:${APP_VERSION:?APP_VERSION required}
+    environment:
+      AUTH_BASE_URL: /auth
+      IDENTITY_BASE_URL: /identity
+      PROMOTION_BASE_URL: /promotion
+      FORM_BASE_URL: /form
+      GATEWAY_BASE_URL: /gateway
+      DASHBOARD_BASE_URL: /dashboard
+      FILE_BASE_URL: /file
+      NOTIFICATION_BASE_URL: /notification
+    ports:
+      - "${WEB_BIND_IP:-127.0.0.1}:80:8080"
+    depends_on:
+      auth: {condition: service_healthy}
+      identity: {condition: service_healthy}
+      promotion: {condition: service_healthy}
+      form: {condition: service_healthy}
+      gateway: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 20s
+      timeout: 8s
+      start_period: 45s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  pgdata: {}
+  neo4jdata: {}
+  kafkadata: {}
+  redisdata: {}
+  ldapdata: {}
+  ldapconfig: {}

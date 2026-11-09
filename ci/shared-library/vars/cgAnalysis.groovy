@@ -26,8 +26,7 @@ def call() {
                   -Dsonar.java.binaries=${dir}/build/classes \\
                   -Dsonar.coverage.jacoco.xmlReportPaths=${dir}/build/reports/jacoco/test/jacocoTestReport.xml \\
                   -Dsonar.qualitygate.wait=true \\
-                  -Dsonar.qualitygate.timeout=300 \\
-                  -Dsonar.coverage.exclusions=**/dto/**,**/model/**,**/repository/**,**/config/**,**/*Application.java,**/*Exception.java,**/task/**
+                  -Dsonar.qualitygate.timeout=300
             """
         }
     }

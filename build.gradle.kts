@@ -51,9 +51,12 @@ subprojects {
     }
 
     tasks.withType<Test> {
-        // Tests tagged "integration" need Docker (Testcontainers); they belong to HU-06 and run with
-        // ./gradlew integrationTest, so the unit-test gate (test + coverage) never depends on Docker.
-        useJUnitPlatform { excludeTags("integration") }
+        // HU-06: only the "test" task excludes integration tests; "integrationTest" must be able to
+        // include them. Applying excludeTags to withType<Test> would conflict with integrationTest's
+        // includeTags and result in zero tests executed.
+        if (name == "test") {
+            useJUnitPlatform { excludeTags("integration") }
+        }
         // HU-05: the main application.yml files leave every secret empty (no secrets in Git), so the
         // Spring test contexts need throwaway values. They are test-only and never reach an image.
         environment("JWT_SECRET", "test-only-jwt-secret-key-with-at-least-32-bytes")

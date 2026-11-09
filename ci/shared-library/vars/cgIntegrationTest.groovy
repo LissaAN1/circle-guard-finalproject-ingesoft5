@@ -29,7 +29,7 @@ def call() {
             }
         }
     } finally {
-        junit testResults: '**/build/test-results/integrationTest/*.xml', allowEmptyResults: true
+        junit testResults: '**/build/test-results/integrationTest/*.xml', allowEmptyResults: false
         archiveArtifacts artifacts: '**/build/reports/tests/integrationTest/**', allowEmptyArchive: true
     }
 }

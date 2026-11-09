@@ -29,12 +29,7 @@ def call() {
                 steps { cgTest() }
             }
             stage('E2E on DEV') {
-                when {
-                    allOf {
-                        expression { env.BRANCH_NAME == 'dev' }
-                        expression { env.CG_E2E_ENABLED == 'true' }
-                    }
-                }
+                when { expression { env.BRANCH_NAME == 'dev' } }
                 steps { cgE2E() }
             }
             stage('Analysis') {

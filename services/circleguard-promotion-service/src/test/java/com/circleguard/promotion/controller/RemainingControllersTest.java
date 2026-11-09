@@ -21,6 +21,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -84,7 +85,7 @@ class RemainingControllersTest {
         SystemSettings patch = SystemSettings.builder().unconfirmedFencingEnabled(false).build();
         admin.updateSettings(patch);
 
-        verify(settingsRepo).save(any(SystemSettings.class));
+        verify(settingsRepo, times(2)).save(any(SystemSettings.class));
     }
 
     @Test
@@ -106,7 +107,7 @@ class RemainingControllersTest {
 
         admin.toggleUnconfirmedFencing(true);
 
-        verify(settingsRepo).save(any(SystemSettings.class));
+        verify(settingsRepo, times(2)).save(any(SystemSettings.class));
     }
 
     @Test

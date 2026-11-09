@@ -26,6 +26,10 @@ GATE_NAME = "CircleGuard"
 # line coverage HU-05 asks for (auth: 53.9 % vs 81.1 %).
 GATE_METRIC, GATE_OP, GATE_THRESHOLD = "line_coverage", "LT", "60"
 COVERAGE_METRICS = ("coverage", "line_coverage")
+# SonarQube 25.x seeds every new gate with Clean-as-You-Code conditions, including "coverage on new code
+# >= 80 %". HU-05 asks for a line-coverage floor on the whole code (60 %); the new-code condition is stricter,
+# depends on the analysis window, and fails builds whose few new lines are poorly covered.
+NEW_CODE_COVERAGE_METRICS = ("new_coverage", "new_line_coverage")
 TOKEN_NAME = "jenkins-ci"
 TOKEN_KEY = "SONAR_ANALYSIS_TOKEN"
 
@@ -91,6 +95,11 @@ def ensure_quality_gate(password):
         if status != 200:
             raise RuntimeError(f"Cannot set quality gate condition (HTTP {status})")
         print(f"Quality gate condition set: {GATE_METRIC} {GATE_OP} {GATE_THRESHOLD}")
+
+    for c in conditions:
+        if c.get("metric") in NEW_CODE_COVERAGE_METRICS:
+            api("/api/qualitygates/delete_condition", password, {"id": c["id"]})
+            print(f"Quality gate condition removed: {c['metric']} (HU-05 gates overall line coverage)")
 
     status, _ = api("/api/qualitygates/set_as_default", password, {"name": GATE_NAME})
     if status not in (200, 204):

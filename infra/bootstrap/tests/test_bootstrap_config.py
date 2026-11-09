@@ -93,6 +93,19 @@ class SonarBootstrapTests(unittest.TestCase):
             sonar.ensure_quality_gate("secret")
         self.assertEqual([c[0] for c in calls], ["/api/qualitygates/set_as_default"])
 
+    def test_new_code_coverage_condition_is_removed_and_other_conditions_kept(self):
+        calls = []
+        seeded = [
+            {"id": "1", "metric": "line_coverage", "op": "LT", "error": "60"},
+            {"id": "2", "metric": "new_coverage", "op": "LT", "error": "80"},
+            {"id": "3", "metric": "new_duplicated_lines_density", "op": "GT", "error": "3"},
+        ]
+        with patch.object(sonar, "api", self.gate_api(["CircleGuard"], seeded, calls)):
+            sonar.ensure_quality_gate("secret")
+        deleted = [d["id"] for p, d in calls if p == "/api/qualitygates/delete_condition"]
+        self.assertEqual(deleted, ["2"])
+        self.assertNotIn("/api/qualitygates/create_condition", [p for p, _ in calls])
+
     def test_lenient_threshold_is_replaced(self):
         calls = []
         stale = [{"id": "7", "metric": "line_coverage", "op": "LT", "error": "10"}]

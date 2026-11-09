@@ -23,6 +23,13 @@ def call(Map cfg = [:]) {
     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key',
                                        keyFileVariable: 'SSH_KEY',
                                        usernameVariable: 'SSH_USER')]) {
+        sh(label: 'upload-compose-files', script: """
+            scp -o StrictHostKeyChecking=accept-new -o BatchMode=yes \\
+              -i "\${SSH_KEY}" \\
+              infra/environments/compose.base.yaml \\
+              infra/environments/compose.${envName}.yaml \\
+              "\${SSH_USER}@${host}:/opt/circleguard/environments/"
+        """)
         sh(label: 'upload-deploy-script', script: """
             scp -o StrictHostKeyChecking=accept-new -o BatchMode=yes \\
               -i "\${SSH_KEY}" \\

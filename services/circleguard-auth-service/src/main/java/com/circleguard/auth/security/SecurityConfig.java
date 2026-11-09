@@ -39,7 +39,7 @@ public class SecurityConfig {
 
     @Bean
     public org.springframework.web.cors.CorsConfigurationSource corsConfigurationSource(
-            @Value("${app.cors.allowed-origins:http://localhost:8081,http://localhost:8080}")
+            @Value("${app.cors.allowed-origins:http://localhost:8081,http://localhost:8080,http://127.0.0.1:8780}")
             String allowedOrigins) {
 
         org.springframework.web.cors.CorsConfiguration configuration =

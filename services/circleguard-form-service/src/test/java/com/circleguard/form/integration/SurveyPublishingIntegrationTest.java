@@ -78,6 +78,9 @@ class SurveyPublishingIntegrationTest {
         // Hibernate usa H2Dialect en test/application.yml; sobrescribir aqui para que
         // DDL generado sea compatible con el contenedor PostgreSQL.
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        // Permite carga lazy de colecciones fuera del scope de transaccion (p.ej. serializacion
+        // de respuesta HTTP despues del commit de @Transactional en submitSurvey).
+        registry.add("spring.jpa.properties.hibernate.enable_lazy_load_no_trans", () -> "true");
         // Solo se sobreescribe el broker. Los serializadores son los de
         // application.yml: si faltan,
         // esta prueba debe fallar porque el servicio tampoco funcionaria en produccion.

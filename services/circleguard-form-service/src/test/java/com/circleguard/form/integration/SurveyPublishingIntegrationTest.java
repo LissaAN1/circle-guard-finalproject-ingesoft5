@@ -209,9 +209,9 @@ class SurveyPublishingIntegrationTest {
             consumer.subscribe(List.of(topic));
             long deadline = System.currentTimeMillis() + 30_000;
             while (System.currentTimeMillis() < deadline) {
-                for (ConsumerRecord<String, String> record : consumer.poll(Duration.ofMillis(500))) {
-                    if (key.equals(record.key())) {
-                        return mapper.readTree(record.value());
+                for (ConsumerRecord<String, String> message : consumer.poll(Duration.ofMillis(500))) {
+                    if (key.equals(message.key())) {
+                        return mapper.readTree(message.value());
                     }
                 }
             }

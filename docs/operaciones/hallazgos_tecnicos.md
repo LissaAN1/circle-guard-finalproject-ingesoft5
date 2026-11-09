@@ -22,7 +22,15 @@
 | promotion | 67 % |
 | gateway | 81 % |
 
+## Cliente web (mobile)
+
+- El error de Babel (`.plugins is not a valid Plugin property`) ya no se reproduce con una instalación limpia
+  (`npm ci`) con las versiones del `package-lock.json`.
+- `hooks/useQrToken.test.ts` estaba desactualizado: el hook ahora recibe `anonymousId` y `authToken` y pide el token por
+  HTTP, mientras la prueba esperaba un token síncrono. Se reescribió con `axios` simulado; las 8 pruebas del cliente
+  pasan con `npm test`.
+
 ## Pendientes
 
-- Las pruebas del cliente `mobile` fallan por un error de lectura de plugins en Babel
-  (`.plugins is not a valid Plugin property`); la unidad `web` sigue en `skip` hasta resolverlo.
+- La unidad `web` sigue en `skip` en `ci/units.conf`: el pipeline todavía no ejecuta Jest. Ejecutar las pruebas del
+  cliente en Jenkins (contenedor Node) queda para la HU-06/HU-07.

@@ -19,6 +19,9 @@ jenkins:
           # Empty NEXUS_REGISTRY disables publishing (the pipeline reports it and moves on).
           - key: "NEXUS_REGISTRY"
             value: "${NEXUS_REGISTRY:-}"
+          # HU-05: empty SONAR_HOST_URL skips the Analysis stage; set, it runs the blocking quality gate.
+          - key: "SONAR_HOST_URL"
+            value: "${SONAR_HOST_URL:-}"
           # HU-09: optional webhook for failure notifications (Slack-compatible).
           - key: "NOTIFY_WEBHOOK_URL"
             value: "${NOTIFY_WEBHOOK_URL:-}"

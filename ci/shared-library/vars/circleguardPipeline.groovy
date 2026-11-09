@@ -1,6 +1,6 @@
-// HU-04/HU-07/HU-08/HU-09: multibranch CI pipeline for the 8 services and the web client.
-// Stages: checkout, detect changes, build, test, E2E (dev), analysis, package, publish,
-//         deploy dev (dev branch), deploy stage + E2E + approve + deploy prod (main branch).
+// HU-04/HU-05/HU-07/HU-08/HU-09: multibranch CI pipeline for the 8 services and the web client.
+// Stages: checkout, detect changes, build, test (+coverage), E2E (dev), analysis (SonarQube quality gate), package,
+//         publish, deploy dev (dev branch), deploy stage + E2E + approve + deploy prod (main branch).
 // Failure/unstable builds trigger cgNotify (GitHub commit status + optional webhook).
 def call() {
     pipeline {
@@ -33,7 +33,7 @@ def call() {
                 steps { cgE2E() }
             }
             stage('Analysis') {
-                when { expression { env.ENABLE_SONAR == 'true' && cgHasUnits('service') } }
+                when { expression { env.SONAR_HOST_URL && cgHasUnits('service') } }
                 steps { cgAnalysis() }
             }
             stage('Package') {

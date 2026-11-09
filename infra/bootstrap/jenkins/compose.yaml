@@ -24,6 +24,8 @@ services:
       JAVA_OPTS: -Djenkins.install.runSetupWizard=false -Xmx1g
       JENKINS_PUBLIC_URL: ${JENKINS_PUBLIC_URL:-http://localhost:8080/}
       NEXUS_REGISTRY: ${NEXUS_REGISTRY:-}
+      # HU-05: SonarQube base URL (private IP); empty disables the Analysis stage
+      SONAR_HOST_URL: ${SONAR_HOST_URL:-}
       # HU-08/HU-09: EC2 host IPs resolved from .env; NOTIFY_WEBHOOK_URL comes from ci.secrets.env (env_file)
       EC2_DEV_HOST: ${EC2_DEV_HOST:-}
       EC2_STAGE_HOST: ${EC2_STAGE_HOST:-}

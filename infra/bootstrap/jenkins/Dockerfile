@@ -17,5 +17,6 @@ RUN jenkins-plugin-cli --plugins \
     job-dsl:3732.v9a_c49a_61a_313 \
     credentials-binding:728.v902a_273b_8947 \
     junit:1458.v38661c0638e2 \
+    jacoco:3.3.7 \
     timestamper:1.30 \
     ws-cleanup:0.49

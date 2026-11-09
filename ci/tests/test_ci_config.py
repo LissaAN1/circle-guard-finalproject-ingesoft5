@@ -75,7 +75,7 @@ class JenkinsConfigTests(unittest.TestCase):
         plugins = re.findall(r"^\s+([a-z0-9-]+):(\S+?)(?:\s*\\)?$", dockerfile, re.M)
         names = {n for n, _ in plugins}
         for required in ("workflow-aggregator", "github-branch-source", "job-dsl", "pipeline-groovy-lib",
-                         "configuration-as-code", "matrix-auth", "junit", "credentials-binding"):
+                         "configuration-as-code", "matrix-auth", "junit", "credentials-binding", "jacoco"):
             self.assertIn(required, names)
         self.assertTrue(all(v and v != "latest" for _, v in plugins))
 
@@ -125,6 +125,58 @@ class SharedLibraryTests(unittest.TestCase):
             text = f.read_text(encoding="utf8")
             with self.subTest(file=f.name):
                 self.assertNotRegex(text, r":latest\b")
+
+
+class QualityGateTests(unittest.TestCase):
+    """HU-05: JaCoCo coverage and the blocking SonarQube quality gate."""
+
+    CORE = ["auth", "identity", "promotion", "form", "gateway"]
+
+    def unit_info(self, unit, field):
+        return subprocess.run([BASH, str(ROOT / "ci" / "scripts" / "unit-info.sh"), unit, field],
+                              check=True, capture_output=True, text=True).stdout.strip()
+
+    def test_core_services_are_gated_and_the_rest_are_not(self):
+        for u in self.CORE:
+            with self.subTest(unit=u):
+                self.assertEqual(self.unit_info(u, "quality"), "gate")
+        for u in ("notification", "file", "dashboard", "web"):
+            with self.subTest(unit=u):
+                self.assertEqual(self.unit_info(u, "quality"), "none")
+
+    def test_jacoco_xml_and_html_reports_for_every_module(self):
+        build = (ROOT / "build.gradle.kts").read_text(encoding="utf8")
+        self.assertIn('apply(plugin = "jacoco")', build)
+        self.assertRegex(build, r"xml\.required\.set\(true\)")
+        self.assertRegex(build, r"html\.required\.set\(true\)")
+        self.assertIn('finalizedBy("jacocoTestReport")', build)
+
+    def test_analysis_waits_for_the_gate_and_feeds_the_jacoco_report(self):
+        text = (VARS / "cgAnalysis.groovy").read_text(encoding="utf8")
+        self.assertIn("-Dsonar.qualitygate.wait=true", text)
+        self.assertIn("sonar.coverage.jacoco.xmlReportPaths", text)
+        self.assertIn("ci/scripts/unit-info.sh ${u} quality", text)
+
+    def test_analysis_stage_runs_when_sonar_is_configured_and_precedes_package(self):
+        pipeline = (VARS / "circleguardPipeline.groovy").read_text(encoding="utf8")
+        self.assertIn("env.SONAR_HOST_URL", pipeline)
+        self.assertNotIn("ENABLE_SONAR", pipeline)
+        self.assertLess(pipeline.index("stage('Analysis')"), pipeline.index("stage('Package')"))
+
+    def test_coverage_is_published_after_the_tests(self):
+        self.assertIn("cgCoverage()", (VARS / "cgTest.groovy").read_text(encoding="utf8"))
+        text = (VARS / "cgCoverage.groovy").read_text(encoding="utf8")
+        self.assertIn("jacoco(", text)
+        self.assertIn("archiveArtifacts", text)
+
+    def test_sonar_host_and_token_reach_jenkins_without_hardcoding(self):
+        casc = (JENKINS / "casc.d" / "10-ci.yaml").read_text(encoding="utf8")
+        self.assertIn("${SONAR_HOST_URL:-}", casc)
+        remote = (JENKINS / "ci-remote.sh").read_text(encoding="utf8")
+        self.assertIn('id: "sonar-token"', remote)
+        self.assertIn("SONAR_TOKEN", remote)
+        compose = yaml.safe_load((JENKINS / "compose.yaml").read_text(encoding="utf8"))
+        self.assertIn("SONAR_HOST_URL", compose["services"]["jenkins"]["environment"])
 
 
 class ScriptSyntaxTests(unittest.TestCase):

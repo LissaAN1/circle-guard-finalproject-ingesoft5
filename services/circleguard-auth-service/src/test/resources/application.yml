@@ -14,3 +14,9 @@ spring:
     database-platform: org.hibernate.dialect.H2Dialect
     hibernate:
       ddl-auto: create-drop
+  ldap:
+    # Only used to build the LdapContextSource bean; no connection is made in unit tests.
+    urls: ldap://localhost:389
+    base: dc=circleguard,dc=edu
+    username: cn=admin,dc=circleguard,dc=edu
+    password: test-only

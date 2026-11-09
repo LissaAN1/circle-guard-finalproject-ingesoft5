@@ -29,7 +29,7 @@ Se apoya en la plataforma de la HU-01 (Jenkins, SonarQube y Nexus en EC2, TEC-04
 1. **Checkout:** clona el commit y descarga la rama base para comparar.
 2. **Detect changes:** calcula las unidades afectadas (`env.CG_UNITS`). Sin cambios construibles, el build termina en verde sin trabajo.
 3. **Build:** `./gradlew assemble` de los servicios afectados.
-4. **Test:** `./gradlew test`. Las unidades con `tests=enforce` rompen el build si fallan. Las de `tests=report` solo lo marcan `UNSTABLE` (hoy: `dashboard`, ver `hallazgos_tecnicos.md`). El informe JUnit queda publicado en Jenkins.
+4. **Test:** `./gradlew test`. Las unidades con `tests=enforce` rompen el build si fallan. Las de `tests=report` solo lo marcan `UNSTABLE` (hoy ninguna: `dashboard` pasó a `enforce` en la HU-05). El informe JUnit queda publicado en Jenkins.
 5. **Analysis:** opcional, apagada por defecto (`ENABLE_SONAR=true`). El quality gate es la HU-05.
 6. **Package:** imagen Docker por unidad con tag inmutable `<semver>-ci.<build>.<sha7>`, nunca `latest`.
 7. **Publish:** solo desde `dev` y `main`, y solo si Jenkins tiene `NEXUS_REGISTRY` configurado. Usa la credencial `nexus-publisher`.

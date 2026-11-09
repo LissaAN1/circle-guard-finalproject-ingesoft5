@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
-# HU-04/HU-09: runs ON the Jenkins EC2 (uploaded and executed by infra/bootstrap-ci.sh).
+# HU-04/HU-08/HU-09: runs ON the Jenkins EC2 (uploaded and executed by infra/bootstrap-ci.sh).
 # Reads optional KEY=VALUE lines from stdin. Missing keys keep their previous value.
 # Accepted keys: GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD, SONAR_TOKEN, SMEE_URL, NEXUS_REGISTRY, SONAR_HOST_URL,
 #   JENKINS_PUBLIC_URL, NOTIFY_WEBHOOK_URL, EC2_DEV_HOST, EC2_STAGE_HOST, EC2_PROD_HOST,
-#   EC2_SSH_KEY_B64 (base64-encoded PEM; enables the rollback job SSH credential).
+#   EC2_SSH_KEY_B64 (base64-encoded PEM; enables the deploy/rollback SSH credential).
 # Idempotent: reruns reuse the existing controller, volumes, agent secret and credentials.
 set -euo pipefail
 
 DIR=/opt/circleguard/jenkins
 SECRETS="$DIR/ci.secrets.env"       # 0600 root: tokens and passwords (never in Git or argv)
 ENVFILE="$DIR/.env"                 # compose interpolation (non-secret)
+EC2_KEY_FILE="$DIR/ec2-key.pem"     # SSH private key bind-mounted into the container at /run/secrets/ec2-key.pem
 AGENT_SECRET_FILE="$DIR/agent.secrets.env"
 CASC_CREDS="$DIR/casc.d/20-credentials.yaml"
 COMPOSE=(docker compose -f "$DIR/compose.yaml")
@@ -19,9 +20,8 @@ install -d -m 0750 "$DIR"
 # casc.d is bind-mounted and read by the non-root jenkins user; it holds no secrets (only ${VAR} refs)
 install -d -m 0755 "$DIR/casc.d"
 touch "$SECRETS" "$ENVFILE"; chmod 600 "$SECRETS"; chmod 644 "$ENVFILE"
-# HU-09: ec2-key.pem must exist before compose starts (bind mount source). Placeholder is empty
+# ec2-key.pem must exist before compose starts (bind mount source). Placeholder is empty
 # until EC2_SSH_KEY_B64 is provided; chown 1000 so the jenkins user inside the container can read it.
-EC2_KEY_FILE="$DIR/ec2-key.pem"
 [[ -f "$EC2_KEY_FILE" ]] || install -m 0400 -o 1000 -g 1000 /dev/null "$EC2_KEY_FILE"
 
 # get/set KEY=VALUE in a file without printing values
@@ -47,7 +47,7 @@ for k in NEXUS_REGISTRY SONAR_HOST_URL JENKINS_PUBLIC_URL EC2_DEV_HOST EC2_STAGE
   [[ -n "${IN[$k]:-}" ]] && set_kv "$ENVFILE" "$k" "${IN[$k]}"
 done
 
-# HU-09: EC2 SSH key (base64-encoded to survive KEY=VALUE stdin). Written to the host path that is
+# EC2 SSH key (base64-encoded to survive KEY=VALUE stdin). Written to the host path that is
 # bind-mounted into the container at /run/secrets/ec2-key.pem; owned by jenkins uid 1000 (0400).
 if [[ -n "${IN[EC2_SSH_KEY_B64]:-}" ]]; then
   printf '%s' "${IN[EC2_SSH_KEY_B64]}" | base64 -d > "$EC2_KEY_FILE"
@@ -80,11 +80,11 @@ set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
     printf '          - string:\n              scope: GLOBAL\n              id: "sonar-token"\n'
     printf '              secret: "${SONAR_TOKEN}"\n              description: "SonarQube analysis token (HU-05 quality gate)"\n'
   fi
-  # HU-09: SSH key for rollback job. Use the container-side mount path, not the host path.
+  # SSH key for deploy/rollback jobs. Use the container-side mount path, not the host path.
   # -s checks the file is non-empty (placeholder is empty until EC2_SSH_KEY_B64 is provided).
   if [[ -s "$EC2_KEY_FILE" ]]; then
     printf '          - basicSSHUserPrivateKey:\n              scope: GLOBAL\n              id: "ec2-ssh-key"\n'
-    printf '              username: "ubuntu"\n              description: "EC2 SSH key for environment rollback (HU-09)"\n'
+    printf '              username: "ubuntu"\n              description: "EC2 SSH key for deploy and rollback (HU-08/HU-09)"\n'
     printf '              privateKeySource:\n                fileOnMaster:\n                  privateKeyFile: "/run/secrets/ec2-key.pem"\n'
   fi
 } > "$CASC_CREDS.new"
@@ -131,6 +131,7 @@ docker run -d --name "$probe" --memory 900m \
   -e JENKINS_TEACHER_USER=probe-teacher -e JENKINS_TEACHER_PASSWORD=probe-not-a-secret \
   -e GITHUB_TOKEN=probe -e NEXUS_PUBLISHER_PASSWORD=probe -e SONAR_TOKEN=probe -e SONAR_HOST_URL= \
   -e JENKINS_PUBLIC_URL=http://localhost:8080/ -e NEXUS_REGISTRY= \
+  -e EC2_DEV_HOST= -e EC2_STAGE_HOST= -e EC2_PROD_HOST= \
   -v "$DIR/casc.yaml:/etc/jenkins/casc.yaml:ro" -v "$DIR/casc.d:/etc/jenkins/casc.d:ro" \
   "$image" >/dev/null
 verdict=timeout

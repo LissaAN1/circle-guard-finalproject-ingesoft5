@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# HU-04/HU-05/HU-09: deploys the CI pipeline layer on the existing Jenkins EC2 (build agent, shared
-# library, multibranch job, rollback job, optional webhook relay and Nexus publishing).
+# HU-04/HU-05/HU-08/HU-09: deploys the CI pipeline layer on the existing Jenkins EC2 (build agent, shared
+# library, multibranch job, rollback job, CD deploy stages, SonarQube analysis, optional webhook relay and Nexus publishing).
 # Idempotent; builds on HU-01.
 #
 # Usage:  bash infra/bootstrap-ci.sh
-# Optional environment (secrets travel over SSH stdin, never as arguments or files in Git):
+# Optional environment (all secrets travel over SSH stdin, never as arguments or files in Git):
 #   GITHUB_TOKEN              token for branch scanning and commit statuses (scopes: repo:status, public_repo)
 #   NEXUS_REGISTRY            Nexus Docker registry as <private-ip>:8082 (enables publishing from dev/main)
 #   NEXUS_PUBLISHER_PASSWORD  password of the Nexus user cg-publisher (read it on the Nexus EC2)
@@ -13,10 +13,10 @@
 #   SONAR_TOKEN               optional: use this analysis token instead of fetching it
 #   SMEE_URL                  smee.io channel URL used as webhook relay
 #   NOTIFY_WEBHOOK_URL        Slack-compatible webhook URL for failure notifications (HU-09, stored as secret)
-#   EC2_DEV_HOST              public IP of circleguard-dev (enables rollback job without TARGET_HOST param)
-#   EC2_STAGE_HOST            public IP of circleguard-stage
-#   EC2_PROD_HOST             public IP of circleguard-prod
-#   EC2_SSH_KEY_B64           base64-encoded EC2 SSH private key (enables rollback SSH credential)
+#   EC2_DEV_HOST              public IP of circleguard-dev (enables auto-deploy to dev and rollback)
+#   EC2_STAGE_HOST            public IP of circleguard-stage (enables auto-deploy to stage from main)
+#   EC2_PROD_HOST             public IP of circleguard-prod (enables deploy to prod after approval)
+#   EC2_SSH_KEY_B64           base64-encoded EC2 SSH private key (required for deploy/rollback jobs)
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=bootstrap-common.sh

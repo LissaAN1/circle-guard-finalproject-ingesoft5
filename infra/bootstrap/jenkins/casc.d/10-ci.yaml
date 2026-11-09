@@ -25,7 +25,7 @@ jenkins:
           # HU-09: optional webhook for failure notifications (Slack-compatible).
           - key: "NOTIFY_WEBHOOK_URL"
             value: "${NOTIFY_WEBHOOK_URL:-}"
-          # HU-09: EC2 public IPs for the rollback job. Set at bootstrap-ci time.
+          # HU-08/HU-09: EC2 public IPs for deploy and rollback jobs. Set at bootstrap-ci time.
           - key: "EC2_DEV_HOST"
             value: "${EC2_DEV_HOST:-}"
           - key: "EC2_STAGE_HOST"

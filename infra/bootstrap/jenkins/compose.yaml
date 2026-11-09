@@ -26,7 +26,7 @@ services:
       NEXUS_REGISTRY: ${NEXUS_REGISTRY:-}
       # HU-05: SonarQube base URL (private IP); empty disables the Analysis stage
       SONAR_HOST_URL: ${SONAR_HOST_URL:-}
-      # HU-09: EC2 host IPs resolved from .env; NOTIFY_WEBHOOK_URL comes from ci.secrets.env (env_file)
+      # HU-08/HU-09: EC2 host IPs resolved from .env; NOTIFY_WEBHOOK_URL comes from ci.secrets.env (env_file)
       EC2_DEV_HOST: ${EC2_DEV_HOST:-}
       EC2_STAGE_HOST: ${EC2_STAGE_HOST:-}
       EC2_PROD_HOST: ${EC2_PROD_HOST:-}
@@ -35,8 +35,8 @@ services:
       - jenkins_home:/var/jenkins_home
       - ./casc.yaml:/etc/jenkins/casc.yaml:ro
       - ./casc.d:/etc/jenkins/casc.d:ro
-      # HU-09: EC2 SSH key for the rollback job. Placeholder created by ci-remote.sh; populated
-      # when EC2_SSH_KEY_B64 is provided at bootstrap time. Mounted read-only for the jenkins user.
+      # HU-08/HU-09: EC2 SSH key for deploy and rollback jobs. Placeholder created by ci-remote.sh;
+      # populated when EC2_SSH_KEY_B64 is provided at bootstrap time. Mounted read-only.
       - /opt/circleguard/jenkins/ec2-key.pem:/run/secrets/ec2-key.pem:ro
 
     healthcheck:

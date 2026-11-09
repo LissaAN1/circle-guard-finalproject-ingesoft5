@@ -13,6 +13,9 @@ VARS = ROOT / "ci" / "shared-library" / "vars"
 BASH = shutil.which("bash")
 
 STAGE_STEPS = ["cgCheckout", "cgDetectChanges", "cgBuild", "cgTest", "cgAnalysis", "cgPackage", "cgPublish"]
+# HU-08 deploy steps: cgDeploy is called with args so we check for the prefix, not bare ()
+DEPLOY_STEPS_BARE = ["cgE2E", "cgApproveProd"]
+DEPLOY_STEPS_WITH_ARGS = ["cgDeploy"]
 
 
 class JenkinsConfigTests(unittest.TestCase):
@@ -93,6 +96,17 @@ class SharedLibraryTests(unittest.TestCase):
         for step in STAGE_STEPS:
             with self.subTest(step=step):
                 self.assertIn(f"{step}()", pipeline)
+                self.assertTrue((VARS / f"{step}.groovy").is_file())
+
+    def test_pipeline_wires_deploy_steps(self):
+        pipeline = (VARS / "circleguardPipeline.groovy").read_text(encoding="utf8")
+        for step in DEPLOY_STEPS_BARE:
+            with self.subTest(step=step):
+                self.assertIn(f"{step}()", pipeline)
+                self.assertTrue((VARS / f"{step}.groovy").is_file())
+        for step in DEPLOY_STEPS_WITH_ARGS:
+            with self.subTest(step=step):
+                self.assertIn(f"{step}(", pipeline)
                 self.assertTrue((VARS / f"{step}.groovy").is_file())
 
     def test_braces_are_balanced(self):

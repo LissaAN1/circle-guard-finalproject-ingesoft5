@@ -4,8 +4,8 @@
 # Rules:
 #   * services/circleguard-<x>-service/** -> unit <x>
 #   * mobile/**                            -> unit web
-#   * repository root build files (Gradle build/settings/wrapper, Jenkinsfile, ci/**, .dockerignore)
-#     affect every unit -> ALL units
+#   * repository root build files (Gradle build/settings/wrapper, lombok.config, Jenkinsfile,
+#     ci/**, infra/environments/**, .dockerignore) affect every unit -> ALL units
 #   * docs, infra, .github and other files -> no unit (nothing to build)
 #   * no BASE_REF, unknown ref, or FORCE_ALL=true -> ALL units
 set -euo pipefail
@@ -30,7 +30,7 @@ while IFS= read -r file; do
     services/circleguard-*-service/*)
       rest="${file#services/circleguard-}"; hit["${rest%%-service/*}"]=1 ;;
     mobile/*) hit[web]=1 ;;
-    build.gradle.kts|settings.gradle.kts|gradle.properties|gradlew|gradlew.bat|gradle/*|Jenkinsfile|.dockerignore|ci/*)
+    build.gradle.kts|settings.gradle.kts|gradle.properties|lombok.config|gradlew|gradlew.bat|gradle/*|Jenkinsfile|.dockerignore|ci/*|infra/environments/*)
       print_all; exit 0 ;;
   esac
 done < <(git -C "$ROOT" diff --name-only "$base...HEAD")

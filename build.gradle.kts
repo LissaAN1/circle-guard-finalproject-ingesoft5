@@ -52,6 +52,10 @@ subprojects {
 
     tasks.withType<Test> {
         useJUnitPlatform()
+        // HU-05: the main application.yml files leave every secret empty (no secrets in Git), so the
+        // Spring test contexts need throwaway values. They are test-only and never reach an image.
+        environment("JWT_SECRET", "test-only-jwt-secret-key-with-at-least-32-bytes")
+        environment("QR_SECRET", "test-only-qr-secret-key-with-at-least-32-bytes")
         finalizedBy("jacocoTestReport")
     }
 

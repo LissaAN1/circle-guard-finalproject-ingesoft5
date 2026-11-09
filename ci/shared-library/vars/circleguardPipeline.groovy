@@ -43,6 +43,10 @@ def call() {
                 }
                 steps { cgPublish() }
             }
+            stage('Integration Test') {
+                when { expression { cgHasUnits('service') } }
+                steps { cgIntegrationTest() }
+            }
         }
 
         post {

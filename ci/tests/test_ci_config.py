@@ -12,7 +12,7 @@ JENKINS = ROOT / "infra" / "bootstrap" / "jenkins"
 VARS = ROOT / "ci" / "shared-library" / "vars"
 BASH = shutil.which("bash")
 
-STAGE_STEPS = ["cgCheckout", "cgDetectChanges", "cgBuild", "cgTest", "cgAnalysis", "cgPackage", "cgPublish"]
+STAGE_STEPS = ["cgCheckout", "cgDetectChanges", "cgBuild", "cgTest", "cgIntegrationTest", "cgAnalysis", "cgPackage", "cgPublish"]
 
 
 class JenkinsConfigTests(unittest.TestCase):

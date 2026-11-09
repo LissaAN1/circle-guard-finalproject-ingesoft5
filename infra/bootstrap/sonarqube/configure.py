@@ -22,7 +22,10 @@ SECRETS = Path("/opt/circleguard/sonarqube/sonar.secrets.env")
 
 # HU-05: line coverage of the gated services (ci/units.conf, quality=gate) must be at least 60 %.
 GATE_NAME = "CircleGuard"
-GATE_METRIC, GATE_OP, GATE_THRESHOLD = "coverage", "LT", "60"
+# line_coverage, not "coverage": Sonar's "coverage" mixes lines and branches and is far lower than the
+# line coverage HU-05 asks for (auth: 53.9 % vs 81.1 %).
+GATE_METRIC, GATE_OP, GATE_THRESHOLD = "line_coverage", "LT", "60"
+COVERAGE_METRICS = ("coverage", "line_coverage")
 TOKEN_NAME = "jenkins-ci"
 TOKEN_KEY = "SONAR_ANALYSIS_TOKEN"
 
@@ -77,9 +80,11 @@ def ensure_quality_gate(password):
     if status != 200:
         raise RuntimeError(f"Cannot read quality gate (HTTP {status})")
     conditions = json.loads(body).get("conditions", [])
-    wanted = [c for c in conditions if c.get("metric") == GATE_METRIC]
-    if not any(c.get("op") == GATE_OP and str(c.get("error")) == GATE_THRESHOLD for c in wanted):
-        for c in wanted:  # a stale threshold would keep the gate too lenient
+    wanted = [c for c in conditions if c.get("metric") in COVERAGE_METRICS]
+    exact = [c for c in wanted if c.get("metric") == GATE_METRIC
+             and c.get("op") == GATE_OP and str(c.get("error")) == GATE_THRESHOLD]
+    if not exact or len(wanted) > 1:
+        for c in wanted:  # a stale threshold or an older metric would keep the gate wrong
             api("/api/qualitygates/delete_condition", password, {"id": c["id"]})
         status, _ = api("/api/qualitygates/create_condition", password, {
             "gateName": GATE_NAME, "metric": GATE_METRIC, "op": GATE_OP, "error": GATE_THRESHOLD})

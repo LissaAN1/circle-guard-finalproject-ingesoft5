@@ -7,7 +7,7 @@ empaquetado si el quality gate falla.
 
 | # | Criterio | Implementación |
 |---|----------|----------------|
-| 1 | Cobertura de líneas ≥ 60 % en auth, identity, promotion, form y gateway | JaCoCo en todos los módulos (`build.gradle.kts`); gate `CircleGuard` en SonarQube con `coverage < 60` → falla |
+| 1 | Cobertura de líneas ≥ 60 % en auth, identity, promotion, form y gateway | JaCoCo en todos los módulos (`build.gradle.kts`); gate `CircleGuard` en SonarQube con `line_coverage < 60` → falla |
 | 2 | Si el quality gate falla, el pipeline falla y no se empaqueta | `cgAnalysis` ejecuta el scanner con `sonar.qualitygate.wait=true`; la etapa `Analysis` va antes de `Package` |
 | 3 | Las pruebas que hoy fallan se corrigen | Ver «Pruebas corregidas» |
 | 4 | El informe de cobertura se publica en Jenkins | `cgCoverage`: plugin JaCoCo (tendencia en la página del build) y HTML archivado |

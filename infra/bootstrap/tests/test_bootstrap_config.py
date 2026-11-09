@@ -83,24 +83,34 @@ class SonarBootstrapTests(unittest.TestCase):
         paths = [c[0] for c in calls]
         self.assertIn("/api/qualitygates/create", paths)
         cond = dict(calls)["/api/qualitygates/create_condition"]
-        self.assertEqual((cond["metric"], cond["op"], cond["error"]), ("coverage", "LT", "60"))
+        self.assertEqual((cond["metric"], cond["op"], cond["error"]), ("line_coverage", "LT", "60"))
         self.assertIn("/api/qualitygates/set_as_default", paths)
 
     def test_quality_gate_rerun_changes_nothing_but_default(self):
         calls = []
-        ok = [{"id": "1", "metric": "coverage", "op": "LT", "error": "60"}]
+        ok = [{"id": "1", "metric": "line_coverage", "op": "LT", "error": "60"}]
         with patch.object(sonar, "api", self.gate_api(["CircleGuard"], ok, calls)):
             sonar.ensure_quality_gate("secret")
         self.assertEqual([c[0] for c in calls], ["/api/qualitygates/set_as_default"])
 
     def test_lenient_threshold_is_replaced(self):
         calls = []
-        stale = [{"id": "7", "metric": "coverage", "op": "LT", "error": "10"}]
+        stale = [{"id": "7", "metric": "line_coverage", "op": "LT", "error": "10"}]
         with patch.object(sonar, "api", self.gate_api(["CircleGuard"], stale, calls)):
             sonar.ensure_quality_gate("secret")
         paths = [c[0] for c in calls]
         self.assertIn("/api/qualitygates/delete_condition", paths)
         self.assertIn("/api/qualitygates/create_condition", paths)
+
+    def test_older_coverage_metric_is_replaced_by_line_coverage(self):
+        calls = []
+        old = [{"id": "3", "metric": "coverage", "op": "LT", "error": "60"}]
+        with patch.object(sonar, "api", self.gate_api(["CircleGuard"], old, calls)):
+            sonar.ensure_quality_gate("secret")
+        paths = [c[0] for c in calls]
+        self.assertIn("/api/qualitygates/delete_condition", paths)
+        created = dict(calls)["/api/qualitygates/create_condition"]
+        self.assertEqual(created["metric"], "line_coverage")
 
     def test_stored_token_is_reused_without_generating_a_new_one(self):
         with tempfile.TemporaryDirectory() as tmp:

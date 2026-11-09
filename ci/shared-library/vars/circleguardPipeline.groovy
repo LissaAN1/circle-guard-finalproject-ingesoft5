@@ -1,7 +1,7 @@
-// HU-04/HU-05/HU-07/HU-08/HU-09: multibranch CI pipeline for the 8 services and the web client.
-// Stages: checkout, detect changes, build, test (+coverage), E2E (dev), analysis (SonarQube quality gate), package,
-//         publish, deploy dev (dev branch), deploy stage + E2E + approve + deploy prod (main branch).
-// Failure/unstable builds trigger cgNotify (GitHub commit status + optional webhook).
+// HU-04/HU-05/HU-06/HU-07/HU-08: multibranch CI pipeline for the 8 services and the web client.
+// Stages: checkout, detect changes, build, test (+coverage), integration test, analysis (SonarQube),
+//         package, publish, deploy dev, E2E on DEV (blocks promotion),
+//         deploy stage + E2E + approve + deploy prod (main branch only).
 def call() {
     pipeline {
         agent { label 'docker' }
@@ -28,14 +28,9 @@ def call() {
                 when { expression { cgHasUnits('service') } }
                 steps { cgTest() }
             }
-            stage('E2E on DEV') {
-                when {
-                    allOf {
-                        expression { env.BRANCH_NAME == 'dev' }
-                        expression { env.CG_E2E_ENABLED == 'true' }
-                    }
-                }
-                steps { cgE2E() }
+            stage('Integration Test') {
+                when { expression { cgHasUnits('service') } }
+                steps { cgIntegrationTest() }
             }
             stage('Analysis') {
                 when { expression { env.SONAR_HOST_URL && cgHasUnits('service') } }
@@ -68,6 +63,12 @@ def call() {
                 steps {
                     script { cgDeploy(environment: 'dev', appVersion: env.CG_IMAGE_TAG) }
                 }
+            }
+            // HU-07: E2E runs AFTER Deploy Dev so it validates the candidate already on the server.
+            // A failure here blocks promotion to stage and prod.
+            stage('E2E on DEV') {
+                when { expression { env.BRANCH_NAME == 'dev' } }
+                steps { cgE2E() }
             }
             stage('Deploy Stage') {
                 when {
@@ -116,10 +117,6 @@ def call() {
                 steps {
                     script { cgDeploy(environment: 'prod', appVersion: env.CG_IMAGE_TAG) }
                 }
-            }
-            stage('Integration Test') {
-                when { expression { cgHasUnits('service') } }
-                steps { cgIntegrationTest() }
             }
         }
 

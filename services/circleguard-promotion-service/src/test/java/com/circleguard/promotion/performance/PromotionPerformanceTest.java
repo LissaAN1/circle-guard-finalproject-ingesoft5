@@ -19,7 +19,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest
 @Tag("integration")
-@Testcontainers
+@Testcontainers(disabledWithoutDocker = true)
 public class PromotionPerformanceTest {
 
     @Container

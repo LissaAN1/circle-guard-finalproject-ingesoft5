@@ -1,3 +1,6 @@
+jwt:
+  secret: "circleguard-test-secret-key-32-chars-min"
+
 spring:
   flyway:
     enabled: false

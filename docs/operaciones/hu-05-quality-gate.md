@@ -37,6 +37,14 @@ Build → Test (JUnit + JaCoCo) → Analysis (SonarQube, gate bloqueante) → Pa
 
 Cambiar una unidad a `gate` no requiere tocar el pipeline.
 
+### Condiciones del gate
+
+SonarQube 25.x crea cada gate nuevo con las condiciones de Clean as You Code. `configure.py` conserva las de
+calidad (0 issues nuevos, hotspots revisados, duplicación ≤ 3 %) y la de cobertura de líneas global ≥ 60 %, y
+**elimina la cobertura sobre código nuevo ≥ 80 %**: es más estricta que el enunciado, depende de la ventana de
+código nuevo y hacía fallar `Analysis` aunque el servicio superara el 60 % (promotion: 78 % global, 63,6 % en las
+pocas líneas nuevas).
+
 ## Despliegue
 
 SonarQube (crea el gate `CircleGuard`, idempotente):

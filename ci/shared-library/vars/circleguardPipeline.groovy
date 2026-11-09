@@ -1,5 +1,5 @@
 // HU-04/HU-09: multibranch CI pipeline for the 8 services and the web client.
-// Stages: checkout, change detection, build, test, analysis (optional), package, publish.
+// Stages: checkout, change detection, build, test (+coverage), analysis (SonarQube quality gate), package, publish.
 // Failure/unstable builds trigger cgNotify (GitHub commit status + optional webhook).
 def call() {
     pipeline {
@@ -28,7 +28,7 @@ def call() {
                 steps { cgTest() }
             }
             stage('Analysis') {
-                when { expression { env.ENABLE_SONAR == 'true' && cgHasUnits('service') } }
+                when { expression { env.SONAR_HOST_URL && cgHasUnits('service') } }
                 steps { cgAnalysis() }
             }
             stage('Package') {

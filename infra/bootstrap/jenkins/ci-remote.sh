@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # HU-04/HU-09: runs ON the Jenkins EC2 (uploaded and executed by infra/bootstrap-ci.sh).
 # Reads optional KEY=VALUE lines from stdin. Missing keys keep their previous value.
-# Accepted keys: GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD, SMEE_URL, NEXUS_REGISTRY,
+# Accepted keys: GITHUB_TOKEN, NEXUS_PUBLISHER_PASSWORD, SONAR_TOKEN, SMEE_URL, NEXUS_REGISTRY, SONAR_HOST_URL,
 #   JENKINS_PUBLIC_URL, NOTIFY_WEBHOOK_URL, EC2_DEV_HOST, EC2_STAGE_HOST, EC2_PROD_HOST,
 #   EC2_SSH_KEY_B64 (base64-encoded PEM; enables the rollback job SSH credential).
 # Idempotent: reruns reuse the existing controller, volumes, agent secret and credentials.
@@ -37,13 +37,13 @@ set_kv() { # file key value
 declare -A IN=()
 if [[ ! -t 0 ]]; then
   while IFS='=' read -r k v; do
-    [[ "$k" =~ ^(GITHUB_TOKEN|NEXUS_PUBLISHER_PASSWORD|SMEE_URL|NEXUS_REGISTRY|JENKINS_PUBLIC_URL|NOTIFY_WEBHOOK_URL|EC2_DEV_HOST|EC2_STAGE_HOST|EC2_PROD_HOST|EC2_SSH_KEY_B64)$ ]] && IN[$k]="$v"
+    [[ "$k" =~ ^(GITHUB_TOKEN|NEXUS_PUBLISHER_PASSWORD|SONAR_TOKEN|SMEE_URL|NEXUS_REGISTRY|SONAR_HOST_URL|JENKINS_PUBLIC_URL|NOTIFY_WEBHOOK_URL|EC2_DEV_HOST|EC2_STAGE_HOST|EC2_PROD_HOST|EC2_SSH_KEY_B64)$ ]] && IN[$k]="$v"
   done
 fi
-for k in GITHUB_TOKEN NEXUS_PUBLISHER_PASSWORD SMEE_URL NOTIFY_WEBHOOK_URL; do
+for k in GITHUB_TOKEN NEXUS_PUBLISHER_PASSWORD SONAR_TOKEN SMEE_URL NOTIFY_WEBHOOK_URL; do
   [[ -n "${IN[$k]:-}" ]] && set_kv "$SECRETS" "$k" "${IN[$k]}"
 done
-for k in NEXUS_REGISTRY JENKINS_PUBLIC_URL EC2_DEV_HOST EC2_STAGE_HOST EC2_PROD_HOST; do
+for k in NEXUS_REGISTRY SONAR_HOST_URL JENKINS_PUBLIC_URL EC2_DEV_HOST EC2_STAGE_HOST EC2_PROD_HOST; do
   [[ -n "${IN[$k]:-}" ]] && set_kv "$ENVFILE" "$k" "${IN[$k]}"
 done
 
@@ -74,6 +74,11 @@ set_kv "$ENVFILE" DOCKER_GID "$(getent group docker | cut -d: -f3)"
     printf '          - usernamePassword:\n              scope: GLOBAL\n              id: "nexus-publisher"\n'
     printf '              username: "cg-publisher"\n              password: "${NEXUS_PUBLISHER_PASSWORD}"\n'
     printf '              description: "Nexus Docker publisher (HU-01 role circleguard-publisher)"\n'
+  fi
+  # HU-05: SonarQube analysis token (quality gate stage); created on the SonarQube EC2 by infra/bootstrap-ci.sh.
+  if [[ -n "$(get "$SECRETS" SONAR_TOKEN)" ]]; then
+    printf '          - string:\n              scope: GLOBAL\n              id: "sonar-token"\n'
+    printf '              secret: "${SONAR_TOKEN}"\n              description: "SonarQube analysis token (HU-05 quality gate)"\n'
   fi
   # HU-09: SSH key for rollback job. Use the container-side mount path, not the host path.
   # -s checks the file is non-empty (placeholder is empty until EC2_SSH_KEY_B64 is provided).
@@ -124,7 +129,7 @@ docker run -d --name "$probe" --memory 900m \
   -e JAVA_OPTS='-Djenkins.install.runSetupWizard=false -Xmx512m' \
   -e JENKINS_ADMIN_USER=probe -e JENKINS_ADMIN_PASSWORD=probe-not-a-secret \
   -e JENKINS_TEACHER_USER=probe-teacher -e JENKINS_TEACHER_PASSWORD=probe-not-a-secret \
-  -e GITHUB_TOKEN=probe -e NEXUS_PUBLISHER_PASSWORD=probe \
+  -e GITHUB_TOKEN=probe -e NEXUS_PUBLISHER_PASSWORD=probe -e SONAR_TOKEN=probe -e SONAR_HOST_URL= \
   -e JENKINS_PUBLIC_URL=http://localhost:8080/ -e NEXUS_REGISTRY= \
   -v "$DIR/casc.yaml:/etc/jenkins/casc.yaml:ro" -v "$DIR/casc.d:/etc/jenkins/casc.d:ro" \
   "$image" >/dev/null

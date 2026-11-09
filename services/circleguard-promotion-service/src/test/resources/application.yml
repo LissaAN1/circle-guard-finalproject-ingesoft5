@@ -1,0 +1,14 @@
+jwt:
+  secret: "circleguard-test-secret-key-32-chars-min"
+
+spring:
+  flyway:
+    enabled: false
+  jpa:
+    hibernate:
+      ddl-auto: none
+  neo4j:
+    uri: bolt://localhost:7687
+    authentication:
+      username: neo4j
+      password: password

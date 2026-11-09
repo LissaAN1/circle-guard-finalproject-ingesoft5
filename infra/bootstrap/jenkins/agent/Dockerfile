@@ -6,7 +6,7 @@ FROM jenkins/inbound-agent:3395.v6e5377b_0fb_3c-4-jdk21
 
 USER root
 RUN apt-get update \
- && apt-get install -y --no-install-recommends git curl ca-certificates jq openssh-client \
+ && apt-get install -y --no-install-recommends git curl ca-certificates jq \
  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker

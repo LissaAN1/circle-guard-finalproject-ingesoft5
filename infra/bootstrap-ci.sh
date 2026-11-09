@@ -63,16 +63,7 @@ bootstrap_upload "$src/ci-remote.sh" "$dst/ci-remote.sh"
   [[ -z "${GITHUB_TOKEN:-}" ]]             || printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
   [[ -z "${NEXUS_PUBLISHER_PASSWORD:-}" ]] || printf 'NEXUS_PUBLISHER_PASSWORD=%s\n' "$NEXUS_PUBLISHER_PASSWORD"
   [[ -z "${SMEE_URL:-}" ]]                 || printf 'SMEE_URL=%s\n' "$SMEE_URL"
-  [[ -z "${NOTIFY_WEBHOOK_URL:-}" ]]       || printf 'NOTIFY_WEBHOOK_URL=%s\n' "$NOTIFY_WEBHOOK_URL"
-  [[ -z "${EC2_DEV_HOST:-}" ]]             || printf 'EC2_DEV_HOST=%s\n' "$EC2_DEV_HOST"
-  [[ -z "${EC2_STAGE_HOST:-}" ]]           || printf 'EC2_STAGE_HOST=%s\n' "$EC2_STAGE_HOST"
-  [[ -z "${EC2_PROD_HOST:-}" ]]            || printf 'EC2_PROD_HOST=%s\n' "$EC2_PROD_HOST"
-  if [[ -n "${EC2_SSH_KEY_B64:-}" ]]; then
-    printf 'EC2_SSH_KEY_B64=%s\n' "$EC2_SSH_KEY_B64"
-  elif [[ -n "${EC2_SSH_KEY_FILE:-}" && -r "${EC2_SSH_KEY_FILE}" ]]; then
-    printf 'EC2_SSH_KEY_B64=%s\n' "$(base64 -w0 < "$EC2_SSH_KEY_FILE")"
-  fi
 } | bootstrap_ssh "sudo bash '$dst/ci-remote.sh'"
 
-printf '\nJenkins: http://%s:8080  (jobs: circleguard, circleguard-rollback; node: build-agent)\n' "$BOOTSTRAP_TARGET_IP"
+printf '\nJenkins: http://%s:8080  (job: circleguard; node: build-agent)\n' "$BOOTSTRAP_TARGET_IP"
 printf 'Check the agent is online and run a scan; see docs/operaciones/hu-04-pipeline-ci.md\n'

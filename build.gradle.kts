@@ -79,5 +79,18 @@ subprojects {
             xml.required.set(true)
             html.required.set(true)
         }
+    tasks.named<Test>("test") {
+        useJUnitPlatform { excludeTags("integration") }
+    }
+
+    val integrationTest by tasks.registering(Test::class) {
+        group = "verification"
+        description = "Pruebas de integracion con Testcontainers (requiere Docker)."
+        val testSourceSet = project.extensions.getByType<SourceSetContainer>()["test"]
+        testClassesDirs = testSourceSet.output.classesDirs
+        classpath = testSourceSet.runtimeClasspath
+        useJUnitPlatform { includeTags("integration") }
+        shouldRunAfter(tasks.named("test"))
+        maxParallelForks = 1
     }
 }

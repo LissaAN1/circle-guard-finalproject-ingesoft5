@@ -117,16 +117,14 @@ def call() {
                     script { cgDeploy(environment: 'prod', appVersion: env.CG_IMAGE_TAG) }
                 }
             }
+            stage('Integration Test') {
+                when { expression { cgHasUnits('service') } }
+                steps { cgIntegrationTest() }
+            }
         }
 
         post {
             always {
-                script {
-                    // HU-09: notify before workspace is wiped so cgNotify can still run sh steps.
-                    if (currentBuild.currentResult in ['FAILURE', 'UNSTABLE']) {
-                        cgNotify(currentBuild.currentResult)
-                    }
-                }
                 sh 'docker image prune -f --filter "until=24h" || true'
                 cleanWs(notFailBuild: true)
             }

@@ -107,6 +107,13 @@ class SurveyEventsIntegrationTest {
     @Autowired
     private StringRedisTemplate redis;
 
+    // El KafkaTemplate interno de HealthStatusService no forma parte de lo que
+    // verifican estos tests (que prueban Neo4j y Redis). Mockearlo evita que
+    // cualquier excepcion del productor interno sea tragada por el try-catch de
+    // SurveyListener e impida la actualizacion de estado.
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
+
     private KafkaTemplate<String, Object> formLikeProducer;
 
     @BeforeEach

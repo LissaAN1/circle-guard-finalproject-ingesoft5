@@ -74,20 +74,16 @@ class SurveyPublishingIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
-        // Flyway crea el schema real (V1-V5); Hibernate no toca el DDL.
-        // ddl-auto=create-drop con PostgreSQLDialect puede omitir columnas JSONB sobre
-        // campos String (Question.options), rompiendo el lazy load en submitSurvey.
-        registry.add("spring.jpa.hibernate.ddl-auto", () -> "none");
-        registry.add("spring.flyway.enabled", () -> "true");
-        registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.flyway.user", POSTGRES::getUsername);
-        registry.add("spring.flyway.password", POSTGRES::getPassword);
-        // Hibernate usa H2Dialect en test/application.yml; sobrescribir aqui para que
-        // el dialecto sea compatible con el contenedor PostgreSQL.
+        // create-drop con PostgreSQL real: Hibernate genera las tablas incluyendo columnas
+        // JSONB (Question.options, HealthSurvey.responses via @Column(columnDefinition="JSONB")).
+        // No usar Flyway aqui para evitar el conflicto con spring.flyway.enabled=false del
+        // test/application.yml, que puede ganar segun el orden de resolucion de propiedades.
+        registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        // Forzar PostgreSQLDialect por las dos rutas de binding (spring.jpa y hibernate directo)
+        // para asegurar que H2Dialect del test/application.yml no se filtre.
         registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
-        // Solo se sobreescribe el broker. Los serializadores son los de
-        // application.yml: si faltan, esta prueba debe fallar porque el servicio
-        // tampoco funcionaria en produccion.
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
     }
 

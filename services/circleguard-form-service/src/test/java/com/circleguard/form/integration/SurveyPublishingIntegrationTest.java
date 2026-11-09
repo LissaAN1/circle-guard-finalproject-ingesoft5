@@ -75,6 +75,9 @@ class SurveyPublishingIntegrationTest {
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
+        // Hibernate usa H2Dialect en test/application.yml; sobrescribir aqui para que
+        // DDL generado sea compatible con el contenedor PostgreSQL.
+        registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
         // Solo se sobreescribe el broker. Los serializadores son los de
         // application.yml: si faltan,
         // esta prueba debe fallar porque el servicio tampoco funcionaria en produccion.

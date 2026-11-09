@@ -110,7 +110,12 @@ class SurveyEventsIntegrationTest {
         Map<String, Object> config = Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class,
+                // Map.of() devuelve ImmutableCollections$MapN, que Jackson no puede
+                // deserializar si el header __TypeId__ apunta a esa clase interna.
+                // Sin headers el consumer recibe JSON plano y lo deserializa como LinkedHashMap,
+                // que es el tipo esperado por el listener (Map<String, Object>).
+                JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         formLikeProducer = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));
     }
 

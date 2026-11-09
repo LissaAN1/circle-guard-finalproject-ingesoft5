@@ -25,9 +25,6 @@ jenkins:
           # HU-09: optional webhook for failure notifications (Slack-compatible).
           - key: "NOTIFY_WEBHOOK_URL"
             value: "${NOTIFY_WEBHOOK_URL:-}"
-          # ci/sandbox: deshabilita integration tests (pre-existing bugs). Eliminar al mergear a dev.
-          - key: "CG_INTEGRATION_ENABLED"
-            value: "false"
           # HU-08/HU-09: EC2 public IPs for deploy and rollback jobs. Set at bootstrap-ci time.
           - key: "EC2_DEV_HOST"
             value: "${EC2_DEV_HOST:-}"

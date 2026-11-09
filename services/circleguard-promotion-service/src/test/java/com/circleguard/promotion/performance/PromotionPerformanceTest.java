@@ -9,7 +9,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.neo4j.core.Neo4jClient;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.Neo4jContainer;
+import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
@@ -26,11 +28,33 @@ public class PromotionPerformanceTest {
     static Neo4jContainer<?> neo4jContainer = new Neo4jContainer<>("neo4j:5.12")
             .withAdminPassword("password");
 
+    @Container
+    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+
+    @Container
+    @SuppressWarnings("resource")
+    static GenericContainer<?> redis = new GenericContainer<>("redis:7.2.1")
+            .withExposedPorts(6379);
+
     @DynamicPropertySource
     static void neo4jProperties(DynamicPropertyRegistry registry) {
         registry.add("spring.neo4j.uri", neo4jContainer::getBoltUrl);
         registry.add("spring.neo4j.authentication.username", () -> "neo4j");
         registry.add("spring.neo4j.authentication.password", () -> "password");
+        // updateStatus usa systemSettingsRepository (JPA) => necesita PostgreSQL real con schema Flyway.
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+        registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        registry.add("spring.flyway.enabled", () -> "true");
+        registry.add("spring.flyway.url", postgres::getJdbcUrl);
+        registry.add("spring.flyway.user", postgres::getUsername);
+        registry.add("spring.flyway.password", postgres::getPassword);
+        // updateStatus escribe en Redis.
+        registry.add("spring.data.redis.host", redis::getHost);
+        registry.add("spring.data.redis.port", redis::getFirstMappedPort);
+        // KafkaTemplate mockeado; evitar reintentos de conexion al broker inexistente.
+        registry.add("spring.kafka.listener.auto-startup", () -> "false");
     }
 
     @Autowired

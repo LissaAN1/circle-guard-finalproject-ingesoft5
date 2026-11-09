@@ -85,6 +85,9 @@ class SurveyPublishingIntegrationTest {
         registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
         registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        registry.add("spring.kafka.producer.value-serializer",
+                () -> "org.springframework.kafka.support.serializer.JsonSerializer");
+        registry.add("spring.kafka.producer.properties.spring.json.add.type.headers", () -> "false");
     }
 
     @Autowired

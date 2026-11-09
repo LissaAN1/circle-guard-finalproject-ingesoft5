@@ -96,6 +96,9 @@ class SurveyEventsIntegrationTest {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         // Si el evento llega antes de que el listener tenga particiones asignadas, no se pierde.
         registry.add("spring.kafka.consumer.auto-offset-reset", () -> "earliest");
+        registry.add("spring.kafka.consumer.value-deserializer",
+                () -> "org.springframework.kafka.support.serializer.JsonDeserializer");
+        registry.add("spring.kafka.consumer.properties.spring.json.trusted.packages", () -> "*");
         // Sin headers __TypeId__ el deserializador necesita un tipo concreto para convertir el
         // JSON plano. LinkedHashMap es el tipo natural de un Map<String,Object> en Jackson.
         registry.add("spring.kafka.consumer.properties.spring.json.value.default.type",

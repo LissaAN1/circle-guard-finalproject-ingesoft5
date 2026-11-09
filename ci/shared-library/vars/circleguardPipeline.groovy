@@ -29,7 +29,12 @@ def call() {
                 steps { cgTest() }
             }
             stage('Integration Test') {
-                when { expression { cgHasUnits('service') } }
+                when {
+                    expression {
+                        cgHasUnits('service') &&
+                        env.CG_INTEGRATION_ENABLED != 'false'
+                    }
+                }
                 steps { cgIntegrationTest() }
             }
             stage('Analysis') {

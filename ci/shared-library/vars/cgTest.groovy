@@ -1,6 +1,7 @@
-// Runs unit tests of the changed services and publishes the JUnit report.
+// Runs unit tests of the changed services, publishes the JUnit report and the JaCoCo coverage (HU-05).
 //   tests=enforce : a failing test fails the build
 //   tests=report  : a failing test only marks the build UNSTABLE (documented baseline failure)
+// jacocoTestReport is finalizedBy every test task (build.gradle.kts), so reports exist even when tests fail.
 def call() {
     List<String> enforce = []
     List<String> report = []
@@ -21,5 +22,6 @@ def call() {
         }
     } finally {
         junit testResults: '**/build/test-results/test/*.xml', allowEmptyResults: true
+        cgCoverage()
     }
 }

@@ -18,6 +18,7 @@ allprojects {
 subprojects {
     apply(plugin = "java")
     apply(plugin = "org.jetbrains.kotlin.jvm")
+    apply(plugin = "jacoco")
     extensions.configure<JavaPluginExtension> {
         toolchain {
             languageVersion.set(JavaLanguageVersion.of(21))
@@ -43,7 +44,23 @@ subprojects {
         }
     }
 
+    // HU-05: line coverage for every module. SonarQube reads the XML report and enforces the 60 % gate
+    // (ci/units.conf marks the units that are gated); the HTML report is published by Jenkins.
+    extensions.configure<JacocoPluginExtension> {
+        toolVersion = "0.8.12"
+    }
+
     tasks.withType<Test> {
         useJUnitPlatform()
+        finalizedBy("jacocoTestReport")
+    }
+
+    // No dependsOn(test): a finalizer that depends on its failed finalized task would be skipped, and the
+    // coverage report is most needed exactly when a test fails.
+    tasks.withType<JacocoReport> {
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
+        }
     }
 }

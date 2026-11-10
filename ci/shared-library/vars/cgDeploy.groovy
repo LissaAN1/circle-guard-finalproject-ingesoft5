@@ -16,8 +16,7 @@ def call(Map cfg = [:]) {
     }
     int reachable = sh(script: "nc -z -w 10 '${host}' 22", returnStatus: true)
     if (reachable != 0) {
-        echo "cgDeploy: ${envName} host ${host} is not reachable on port 22 — deploy skipped. Start the EC2 instance to enable deployments."
-        return
+        error("cgDeploy: SSH connectivity check failed for ${envName} (${host}:22). Deployment aborted.")
     }
     echo "Deploying to ${envName}: ${appVersion}"
     withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key',

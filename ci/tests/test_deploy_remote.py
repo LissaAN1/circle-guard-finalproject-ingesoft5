@@ -87,7 +87,7 @@ case "$operation" in
     for infrastructure in postgres neo4j zookeeper kafka redis openldap; do
       [[ " $* " != *" $infrastructure "* ]] || exit 44
     done
-    [[ " $* " == *" --no-deps "* ]] || exit 45
+    [[ " $* " != *" --no-deps "* ]] || exit 45
     ;;
   up)
     [[ " $* " == *" --no-build "* ]] || exit 46
@@ -157,7 +157,10 @@ esac
         self.assertNotEqual(result.returncode, 0)
         self.assertEqual(self.env_file.read_text(encoding="utf8"), self.initial_env)
         self.assertEqual(self.operations(), [
-            "config:candidate-456", "pull:candidate-456", "up:candidate-456", "up:previous-123"
+            "config:candidate-456",
+            "pull:candidate-456",
+            "up:candidate-456",
+            "up:previous-123",
         ])
         self.assertIn("Rollback completed", result.stderr)
         self.assert_private_files_unchanged()

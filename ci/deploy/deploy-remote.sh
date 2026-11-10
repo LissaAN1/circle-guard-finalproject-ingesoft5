@@ -145,7 +145,7 @@ echo "Checking candidate images in Nexus..."
 
 # Pull only CircleGuard application images.
 # Do not update databases or infrastructure images.
-"${compose_candidate[@]}" pull --no-deps "${app_services[@]}"
+"${compose_candidate[@]}" pull "${app_services[@]}"
 
 # Phase 2: apply the previously validated candidate.
 echo "Candidate validated. Applying $app_version..."

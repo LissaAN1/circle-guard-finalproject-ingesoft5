@@ -5,7 +5,12 @@
 def call(Map cfg = [:]) {
     String envName    = cfg.environment
     String appVersion = cfg.appVersion
-    if (!envName)          error('cgDeploy: environment is required')
+    if (!envName) {
+        error('cgDeploy: environment is required')
+    }
+    if (!(envName in ['dev', 'stage', 'prod'])) {
+        error("cgDeploy: unsupported environment '${envName}'")
+    }
     if (!appVersion?.trim()) error('cgDeploy: appVersion is required')
     if (!(appVersion ==~ /^[0-9A-Za-z][0-9A-Za-z._+\-]{0,127}$/)) {
         error("cgDeploy: appVersion '${appVersion}' contains invalid characters")
@@ -19,27 +24,58 @@ def call(Map cfg = [:]) {
         error("cgDeploy: SSH connectivity check failed for ${envName} (${host}:22). Deployment aborted.")
     }
     echo "Deploying to ${envName}: ${appVersion}"
-    withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key',
-                                       keyFileVariable: 'SSH_KEY',
-                                       usernameVariable: 'SSH_USER')]) {
-        sh(label: 'upload-compose-files', script: """
-            scp -o StrictHostKeyChecking=accept-new -o BatchMode=yes \\
-              -i "\${SSH_KEY}" \\
-              infra/environments/compose.base.yaml \\
-              infra/environments/compose.${envName}.yaml \\
-              "\${SSH_USER}@${host}:/opt/circleguard/environments/"
-        """)
-        sh(label: 'upload-deploy-script', script: """
-            scp -o StrictHostKeyChecking=accept-new -o BatchMode=yes \\
-              -i "\${SSH_KEY}" \\
-              ci/deploy/deploy-remote.sh \\
-              "\${SSH_USER}@${host}:/tmp/cg-deploy-remote.sh"
-        """)
-        sh(label: "deploy-${envName}", script: """
-            ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes \\
-              -i "\${SSH_KEY}" \\
-              "\${SSH_USER}@${host}" \\
-              "bash /tmp/cg-deploy-remote.sh '${envName}' '${appVersion}'; rm -f /tmp/cg-deploy-remote.sh"
-        """)
+
+    withCredentials([sshUserPrivateKey(
+        credentialsId: 'ec2-ssh-key',
+        keyFileVariable: 'SSH_KEY',
+        usernameVariable: 'SSH_USER'
+    )]) {
+        withEnv(["CG_DEPLOY_HOST=${host}",
+                 "CG_DEPLOY_ENV=${envName}",
+                 "CG_DEPLOY_VERSION=${appVersion}"]) {
+            sh(label: "deploy-${envName}", script: '''#!/usr/bin/env bash
+set -euo pipefail
+
+ssh_opts=(
+  -o StrictHostKeyChecking=accept-new
+  -o BatchMode=yes
+  -o IdentitiesOnly=yes
+  -i "$SSH_KEY"
+)
+target="${SSH_USER}@${CG_DEPLOY_HOST}"
+
+# Preflight: SSH and non-interactive sudo.
+ssh "${ssh_opts[@]}" "$target" 'sudo -n true'
+
+# Unique, private directory on the target.
+remote_tmp="$(
+  ssh "${ssh_opts[@]}" "$target" \
+    'mktemp -d /tmp/cg-deploy.XXXXXXXX'
+)"
+
+cleanup() {
+  ssh "${ssh_opts[@]}" "$target" \
+    "rm -rf -- '$remote_tmp'" || true
+}
+trap cleanup EXIT
+
+scp "${ssh_opts[@]}" \
+  "infra/environments/compose.base.yaml" \
+  "infra/environments/compose.${CG_DEPLOY_ENV}.yaml" \
+  "ci/deploy/deploy-remote.sh" \
+  "$target:$remote_tmp/"
+
+# Preserve the private .env and init-db.sql.
+ssh "${ssh_opts[@]}" "$target" \
+  "sudo -n install -m 644 \
+  '$remote_tmp/compose.base.yaml' \
+  /opt/circleguard/environments/compose.base.yaml && \
+  sudo -n install -m 644 \
+  '$remote_tmp/compose.${CG_DEPLOY_ENV}.yaml' \
+  '/opt/circleguard/environments/compose.${CG_DEPLOY_ENV}.yaml' && \
+  sudo -n bash '$remote_tmp/deploy-remote.sh' \
+  '$CG_DEPLOY_ENV' '$CG_DEPLOY_VERSION'"
+''')
+        }
     }
 }

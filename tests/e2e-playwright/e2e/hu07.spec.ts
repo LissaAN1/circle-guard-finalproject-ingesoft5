@@ -12,7 +12,8 @@ async function signIn(page: Page, account: 'survey' | 'gate' = 'survey') {
   await page.getByPlaceholder('Password').fill(password);
   await page.getByText('SIGN IN', { exact: true }).click();
   await expect(page).not.toHaveURL(/\/login(?:\?|$)/);
-  await expect(page.getByText('STATUS', { exact: true })).toBeVisible();
+  await expect(page.getByText('REPORT', { exact: true })).toBeVisible();
+  await expect(page.getByText('LOGOUT', { exact: true })).toBeVisible();
   expect(await page.evaluate(() => Boolean(localStorage.getItem('circleguard_token')))).toBe(true);
 }
 

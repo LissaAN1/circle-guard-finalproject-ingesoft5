@@ -11,7 +11,8 @@ class Hu07PipelineContract(unittest.TestCase):
         self.assertIn("env.BRANCH_NAME == 'dev'", code)
         # E2E must run AFTER Deploy Dev so it validates the candidate already on the server.
         self.assertGreater(code.index("stage('E2E on DEV')"), code.index("stage('Deploy Dev')"))
-        self.assertIn('cgE2E()', code)
+        self.assertIn("cgE2E(environment: 'dev')", code)
+        self.assertIn("cgE2E(environment: 'stage')", code)
 
     def test_runner_fails_on_test_failure_and_reports(self):
         code = (ROOT / 'ci/shared-library/vars/cgE2E.groovy').read_text()

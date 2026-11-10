@@ -15,8 +15,8 @@ BASH = shutil.which("bash")
 
 STAGE_STEPS = ["cgCheckout", "cgDetectChanges", "cgBuild", "cgTest", "cgIntegrationTest", "cgAnalysis", "cgPackage", "cgPublish"]
 # HU-08 deploy steps: cgDeploy is called with args so we check for the prefix, not bare ()
-DEPLOY_STEPS_BARE = ["cgE2E", "cgApproveProd"]
-DEPLOY_STEPS_WITH_ARGS = ["cgDeploy"]
+DEPLOY_STEPS_BARE = ["cgApproveProd"]
+DEPLOY_STEPS_WITH_ARGS = ["cgDeploy", "cgE2E"]
 
 
 class JenkinsConfigTests(unittest.TestCase):
@@ -253,6 +253,83 @@ class ProductionReleaseGuardTests(unittest.TestCase):
     def test_approval_precedes_deploy_prod(self):
         self.assertLess(self.pipeline.index("stage('Approve Prod')"), self.pipeline.index("stage('Deploy Prod')"))
         self.assertIn("cgApproveProd()", self.prod_stage("Approve Prod"))
+
+
+class E2EEnvironmentIsolationTests(unittest.TestCase):
+    """Block C: offline checks for environment selection and DEV compatibility."""
+
+    def setUp(self):
+        self.pipeline = (VARS / "circleguardPipeline.groovy").read_text(encoding="utf8")
+        self.e2e = (VARS / "cgE2E.groovy").read_text(encoding="utf8")
+        scripts = ROOT / "tests" / "e2e-playwright" / "scripts"
+        self.shared_runner_path = scripts / "run-env.sh"
+        self.shared_runner = self.shared_runner_path.read_text(encoding="utf8")
+        self.dev_wrapper = (scripts / "run-dev.sh").read_text(encoding="utf8")
+
+    def test_pipeline_selects_correct_environment(self):
+        dev_stage = self.pipeline.split("stage('E2E on DEV')", 1)[1].split("stage('Deploy Stage')", 1)[0]
+        stage_e2e = self.pipeline.split("stage('E2E Tests')", 1)[1].split("stage('Approve Prod')", 1)[0]
+        self.assertIn("cgE2E(environment: 'dev')", dev_stage)
+        self.assertIn("cgE2E(environment: 'stage')", stage_e2e)
+        self.assertNotIn("cgE2E()", self.pipeline)
+
+    def test_groovy_rejects_prod_and_requires_explicit_environment(self):
+        self.assertIn("def call(Map cfg = [:])", self.e2e)
+        self.assertRegex(self.e2e, r"envName\s+in\s+\['dev',\s*'stage'\]")
+        self.assertIn("cgE2E: environment must be", self.e2e)
+
+    def test_dev_credential_ids_are_preserved(self):
+        for credential in (
+            "circleguard-dev-ssh",
+            "circleguard-dev-host",
+            "circleguard-e2e-survey",
+            "circleguard-e2e-gate",
+        ):
+            with self.subTest(credential=credential):
+                self.assertIn(credential, self.e2e)
+        self.assertIn("bash tests/e2e-playwright/scripts/run-dev.sh", self.e2e)
+
+    def test_stage_has_separate_credential_ids(self):
+        for credential in (
+            "circleguard-stage-ssh",
+            "circleguard-stage-host",
+            "circleguard-stage-e2e-survey",
+            "circleguard-stage-e2e-gate",
+        ):
+            with self.subTest(credential=credential):
+                self.assertIn(credential, self.e2e)
+        self.assertIn("bash tests/e2e-playwright/scripts/run-env.sh stage", self.e2e)
+
+    def test_shared_runner_targets_environment_specific_redis_and_ports(self):
+        self.assertIn('REDIS_CONTAINER="circleguard-${E2E_ENV}-redis-1"', self.shared_runner)
+        self.assertIn('dev) E2E_LOCAL_PORT=8780', self.shared_runner)
+        self.assertIn('stage) E2E_LOCAL_PORT=8781', self.shared_runner)
+        self.assertIn('E2E_TARGET_HOST', self.shared_runner)
+        self.assertNotIn('circleguard-dev-redis-1', self.shared_runner)
+
+    def test_dev_wrapper_remains_compatible(self):
+        self.assertIn('E2E_DEV_HOST', self.dev_wrapper)
+        self.assertIn('export E2E_TARGET_HOST="$E2E_DEV_HOST"', self.dev_wrapper)
+        self.assertIn('exec bash "$SCRIPT_DIR/run-env.sh" dev', self.dev_wrapper)
+
+    def test_shared_runner_rejects_prod_before_connecting(self):
+        result = subprocess.run(
+            [BASH, str(self.shared_runner_path), "prod"],
+            cwd=ROOT, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("Usage: run-env.sh dev|stage", result.stderr)
+
+    def test_shared_runner_rejects_unconfigured_stage_without_connecting(self):
+        environment = os.environ.copy()
+        environment.pop("E2E_TARGET_HOST", None)
+        result = subprocess.run(
+            [BASH, str(self.shared_runner_path), "stage"],
+            cwd=ROOT, env=environment,
+            capture_output=True, text=True, check=False,
+        )
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("E2E_TARGET_HOST", result.stderr)
 
 
 class QualityGateTests(unittest.TestCase):

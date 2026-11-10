@@ -1,5 +1,5 @@
 // Pushes the images built in this run to Nexus. Credentials are injected, never written to the log.
-// If 'nexus-publisher' is not yet configured in Jenkins the stage is skipped without failing the build.
+// If 'nexus-publisher' is not configured in Jenkins, publication fails.
 def call() {
     try {
         withCredentials([usernamePassword(credentialsId: 'nexus-publisher',
@@ -11,8 +11,10 @@ def call() {
         }
     } catch (hudson.AbortException e) {
         if (e.message?.contains('nexus-publisher')) {
-            echo 'Publish skipped: nexus-publisher credential not found in Jenkins. Run ci-remote.sh with NEXUS_PUBLISHER_PASSWORD to enable.'
-            return
+            error(
+                'Publish aborted: required Nexus credential ' +
+                'nexus-publisher is unavailable'
+            )
         }
         throw e
     }

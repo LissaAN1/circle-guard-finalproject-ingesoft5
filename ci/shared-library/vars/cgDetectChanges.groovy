@@ -12,9 +12,23 @@ def call() {
         base = 'origin/dev'
     }
 
-    String out = withEnv(["CG_BASE=${base}"]) {
-        sh(script: 'ci/scripts/changed-units.sh "$CG_BASE"', returnStdout: true).trim()
+    boolean fullRelease = env.BRANCH_NAME == 'main' && !env.CHANGE_ID
+    String forceAll = fullRelease ? 'true' : (env.FORCE_ALL ?: 'false')
+
+    String out = withEnv([
+        "CG_BASE=${base}",
+        "FORCE_ALL=${forceAll}"
+    ]) {
+        sh(
+            script: 'ci/scripts/changed-units.sh "$CG_BASE"',
+            returnStdout: true
+        ).trim()
     }
+
+    if (fullRelease) {
+        echo 'Release main: processing all units'
+    }
+
     List<String> units = out ? out.split('\n').collect { it.trim() }.findAll { it } : []
 
     List<String> services = []

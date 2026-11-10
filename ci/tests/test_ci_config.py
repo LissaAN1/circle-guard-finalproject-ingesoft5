@@ -1,4 +1,5 @@
 """Offline HU-04 structural checks for the Jenkins configuration and the shared library."""
+import os
 import re
 import shutil
 import subprocess
@@ -125,6 +126,86 @@ class SharedLibraryTests(unittest.TestCase):
             text = f.read_text(encoding="utf8")
             with self.subTest(file=f.name):
                 self.assertNotRegex(text, r":latest\b")
+
+    # Bloque A: release completo y publicacion obligatoria.
+
+    def test_main_release_forces_all_units(self):
+        text = (VARS / "cgDetectChanges.groovy").read_text(encoding="utf8")
+
+        self.assertRegex(
+            text,
+            r"boolean\s+fullRelease\s*=\s*"
+            r"env\.BRANCH_NAME\s*==\s*'main'\s*&&\s*!env\.CHANGE_ID"
+        )
+        self.assertRegex(
+            text,
+            r"String\s+forceAll\s*=\s*fullRelease\s*\?\s*"
+            r"'true'\s*:\s*\(env\.FORCE_ALL\s*\?:\s*'false'\)"
+        )
+        self.assertIn('"FORCE_ALL=${forceAll}"', text)
+        self.assertIn("Release main: processing all units", text)
+
+    def test_dev_preserves_incremental_detection(self):
+        text = (VARS / "cgDetectChanges.groovy").read_text(encoding="utf8")
+
+        self.assertIn("env.BRANCH_NAME == 'main' && !env.CHANGE_ID", text)
+        self.assertIn("(env.FORCE_ALL ?: 'false')", text)
+        self.assertIn("env.BRANCH_NAME in ['dev', 'main']", text)
+        self.assertIn("base = 'HEAD~1'", text)
+        self.assertIn('ci/scripts/changed-units.sh "$CG_BASE"', text)
+
+    def test_publish_fails_when_nexus_credential_is_missing(self):
+        text = (VARS / "cgPublish.groovy").read_text(encoding="utf8")
+
+        self.assertIn("credentialsId: 'nexus-publisher'", text)
+        self.assertIn("catch (hudson.AbortException e)", text)
+        self.assertIn("e.message?.contains('nexus-publisher')", text)
+        self.assertIn("Publish aborted: required Nexus credential", text)
+        self.assertIn("nexus-publisher is unavailable", text)
+        self.assertNotIn("Publish skipped:", text)
+
+        self.assertRegex(
+            text,
+            r"if\s*\(e\.message\?\.contains\('nexus-publisher'\)\)"
+            r"\s*\{\s*error\s*\("
+        )
+
+        self.assertRegex(
+            text,
+            r"\}\s*throw e\s*\}"
+        )
+
+    def test_force_all_returns_nine_units(self):
+        script = ROOT / "ci" / "scripts" / "changed-units.sh"
+
+        environment = os.environ.copy()
+        environment["FORCE_ALL"] = "true"
+
+        result = subprocess.run(
+            [BASH, str(script), "HEAD~1"],
+            cwd=ROOT,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        units = result.stdout.splitlines()
+
+        expected = {
+            "auth",
+            "identity",
+            "promotion",
+            "notification",
+            "form",
+            "file",
+            "gateway",
+            "dashboard",
+            "web",
+        }
+
+        self.assertEqual(len(units), 9)
+        self.assertEqual(set(units), expected)
 
 
 class QualityGateTests(unittest.TestCase):

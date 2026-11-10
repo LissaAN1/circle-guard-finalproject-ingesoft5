@@ -73,7 +73,7 @@ def call() {
             // A failure here blocks promotion to stage and prod.
             stage('E2E on DEV') {
                 when { expression { env.BRANCH_NAME == 'dev' } }
-                steps { cgE2E() }
+                steps { cgE2E(environment: 'dev') }
             }
             stage('Deploy Stage') {
                 when {
@@ -96,7 +96,7 @@ def call() {
                         expression { env.NEXUS_REGISTRY?.trim() as Boolean }
                     }
                 }
-                steps { cgE2E() }
+                steps { cgE2E(environment: 'stage') }
             }
             stage('Approve Prod') {
                 when {
@@ -104,6 +104,7 @@ def call() {
                         expression { env.BRANCH_NAME == 'main' }
                         expression { !env.CHANGE_ID }
                         expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                        expression { env.CG_ENABLE_PROD_RELEASE == 'true' }
                     }
                 }
                 steps {
@@ -117,6 +118,7 @@ def call() {
                         expression { !env.CHANGE_ID }
                         expression { env.CG_IMAGE_TAG?.trim() as Boolean }
                         expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                        expression { env.CG_ENABLE_PROD_RELEASE == 'true' }
                     }
                 }
                 steps {

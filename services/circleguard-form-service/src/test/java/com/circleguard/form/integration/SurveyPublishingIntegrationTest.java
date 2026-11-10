@@ -74,11 +74,20 @@ class SurveyPublishingIntegrationTest {
         registry.add("spring.datasource.username", POSTGRES::getUsername);
         registry.add("spring.datasource.password", POSTGRES::getPassword);
         registry.add("spring.datasource.driver-class-name", () -> "org.postgresql.Driver");
+        // create-drop con PostgreSQL real: Hibernate genera las tablas incluyendo columnas
+        // JSONB (Question.options, HealthSurvey.responses via @Column(columnDefinition="JSONB")).
+        // No usar Flyway aqui para evitar el conflicto con spring.flyway.enabled=false del
+        // test/application.yml, que puede ganar segun el orden de resolucion de propiedades.
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
-        // Solo se sobreescribe el broker. Los serializadores son los de
-        // application.yml: si faltan,
-        // esta prueba debe fallar porque el servicio tampoco funcionaria en produccion.
+        // Forzar PostgreSQLDialect por las dos rutas de binding (spring.jpa y hibernate directo)
+        // para asegurar que H2Dialect del test/application.yml no se filtre.
+        registry.add("spring.jpa.database-platform", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.jpa.properties.hibernate.dialect", () -> "org.hibernate.dialect.PostgreSQLDialect");
+        registry.add("spring.flyway.enabled", () -> "false");
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
+        registry.add("spring.kafka.producer.value-serializer",
+                () -> "org.springframework.kafka.support.serializer.JsonSerializer");
+        registry.add("spring.kafka.producer.properties.spring.json.add.type.headers", () -> "false");
     }
 
     @Autowired

@@ -96,12 +96,26 @@ class SurveyEventsIntegrationTest {
         registry.add("spring.kafka.bootstrap-servers", KAFKA::getBootstrapServers);
         // Si el evento llega antes de que el listener tenga particiones asignadas, no se pierde.
         registry.add("spring.kafka.consumer.auto-offset-reset", () -> "earliest");
+        registry.add("spring.kafka.consumer.value-deserializer",
+                () -> "org.springframework.kafka.support.serializer.JsonDeserializer");
+        registry.add("spring.kafka.consumer.properties.spring.json.trusted.packages", () -> "*");
+        // Sin headers __TypeId__ el deserializador necesita un tipo concreto para convertir el
+        // JSON plano. LinkedHashMap es el tipo natural de un Map<String,Object> en Jackson.
+        registry.add("spring.kafka.consumer.properties.spring.json.value.default.type",
+                () -> "java.util.HashMap");
     }
 
     @Autowired
     private UserNodeRepository userRepository;
     @Autowired
     private StringRedisTemplate redis;
+
+    // El KafkaTemplate interno de HealthStatusService no forma parte de lo que
+    // verifican estos tests (que prueban Neo4j y Redis). Mockearlo evita que
+    // cualquier excepcion del productor interno sea tragada por el try-catch de
+    // SurveyListener e impida la actualizacion de estado.
+    @org.springframework.boot.test.mock.mockito.MockBean
+    private org.springframework.kafka.core.KafkaTemplate<String, Object> kafkaTemplate;
 
     private KafkaTemplate<String, Object> formLikeProducer;
 
@@ -110,7 +124,12 @@ class SurveyEventsIntegrationTest {
         Map<String, Object> config = Map.of(
                 ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, KAFKA.getBootstrapServers(),
                 ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class,
-                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+                ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class,
+                // Map.of() devuelve ImmutableCollections$MapN, que Jackson no puede
+                // deserializar si el header __TypeId__ apunta a esa clase interna.
+                // Sin headers el consumer recibe JSON plano y lo deserializa como LinkedHashMap,
+                // que es el tipo esperado por el listener (Map<String, Object>).
+                JsonSerializer.ADD_TYPE_INFO_HEADERS, false);
         formLikeProducer = new KafkaTemplate<>(new DefaultKafkaProducerFactory<>(config));
     }
 

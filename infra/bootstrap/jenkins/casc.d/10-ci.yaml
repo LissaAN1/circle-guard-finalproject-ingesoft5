@@ -40,7 +40,7 @@ unclassified:
   globalLibraries:
     libraries:
       - name: "circleguard-ci"
-        defaultVersion: "dev"
+        defaultVersion: ""
         implicit: false
         allowVersionOverride: true
         includeInChangesets: false

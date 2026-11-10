@@ -71,4 +71,39 @@ class HealthStatusControllerTest {
                         .content(json))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    @WithMockUser(roles = "HEALTH_CENTER")
+    void reportStatus_WithPermission_CallsUpdateStatusWithThreeArgs() throws Exception {
+        String json = "{\"anonymousId\": \"user-1\", \"status\": \"CONFIRMED\"}";
+
+        mockMvc.perform(post("/api/v1/health/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk());
+
+        verify(statusService).updateStatus("user-1", "CONFIRMED", false);
+    }
+
+    @Test
+    @WithMockUser(roles = "HEALTH_CENTER")
+    void reportStatus_WithAdminOverride_PassesOverrideFlag() throws Exception {
+        String json = "{\"anonymousId\": \"user-1\", \"status\": \"CONFIRMED\", \"adminOverride\": true}";
+
+        mockMvc.perform(post("/api/v1/health/report")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(json))
+                .andExpect(status().isOk());
+
+        verify(statusService).updateStatus("user-1", "CONFIRMED", true);
+    }
+
+    @Test
+    @WithMockUser(roles = "HEALTH_CENTER")
+    void recover_WithPermission_CallsPromoteToRecovered() throws Exception {
+        mockMvc.perform(post("/api/v1/health/recovery/{id}", "user-1"))
+                .andExpect(status().isOk());
+
+        verify(statusService).promoteToRecovered("user-1");
+    }
 }

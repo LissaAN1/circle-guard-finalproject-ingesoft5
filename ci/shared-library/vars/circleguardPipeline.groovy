@@ -104,6 +104,7 @@ def call() {
                         expression { env.BRANCH_NAME == 'main' }
                         expression { !env.CHANGE_ID }
                         expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                        expression { env.CG_ENABLE_PROD_RELEASE == 'true' }
                     }
                 }
                 steps {
@@ -117,6 +118,7 @@ def call() {
                         expression { !env.CHANGE_ID }
                         expression { env.CG_IMAGE_TAG?.trim() as Boolean }
                         expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                        expression { env.CG_ENABLE_PROD_RELEASE == 'true' }
                     }
                 }
                 steps {

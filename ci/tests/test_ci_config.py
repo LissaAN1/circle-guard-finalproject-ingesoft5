@@ -208,6 +208,53 @@ class SharedLibraryTests(unittest.TestCase):
         self.assertEqual(set(units), expected)
 
 
+class ProductionReleaseGuardTests(unittest.TestCase):
+    """Block D: structural safety checks; Jenkins authorization is tested separately."""
+
+    def setUp(self):
+        self.pipeline = (VARS / "circleguardPipeline.groovy").read_text(encoding="utf8")
+        self.approval = (VARS / "cgApproveProd.groovy").read_text(encoding="utf8")
+
+    def prod_stage(self, name):
+        start = self.pipeline.index(f"stage('{name}')")
+        next_stage = self.pipeline.find("stage('", start + len(f"stage('{name}')"))
+        return self.pipeline[start:next_stage if next_stage != -1 else len(self.pipeline)]
+
+    def test_production_stages_require_explicit_enablement(self):
+        guard = "expression { env.CG_ENABLE_PROD_RELEASE == 'true' }"
+        for name in ("Approve Prod", "Deploy Prod"):
+            with self.subTest(stage=name):
+                stage = self.prod_stage(name)
+                self.assertIn(guard, stage)
+                self.assertLess(stage.index(guard), stage.index("steps {"))
+                self.assertIn("expression { env.BRANCH_NAME == 'main' }", stage)
+                self.assertIn("expression { !env.CHANGE_ID }", stage)
+                self.assertIn("expression { env.NEXUS_REGISTRY?.trim() as Boolean }", stage)
+
+    def test_deploy_prod_requires_image_tag(self):
+        stage = self.prod_stage("Deploy Prod")
+        self.assertIn("expression { env.CG_IMAGE_TAG?.trim() as Boolean }", stage)
+        self.assertIn("cgDeploy(environment: 'prod', appVersion: env.CG_IMAGE_TAG)", stage)
+
+    def test_approval_rejects_missing_approvers_and_disabled_release(self):
+        self.assertIn("String approvers = env.CG_PROD_APPROVERS?.trim()", self.approval)
+        self.assertRegex(self.approval, r"if\s*\(!approvers\)\s*\{\s*error\('cgApproveProd: CG_PROD_APPROVERS is required'\)")
+        self.assertRegex(self.approval, r"if\s*\(env\.CG_ENABLE_PROD_RELEASE != 'true'\)\s*\{\s*error\('cgApproveProd: production release is disabled'\)")
+
+    def test_approval_rejects_missing_image_tag(self):
+        self.assertRegex(self.approval, r"if\s*\(!env\.CG_IMAGE_TAG\?\.trim\(\)\)\s*\{\s*error\('cgApproveProd: release image tag is required'\)")
+
+    def test_approval_restricts_submitter_and_times_out(self):
+        self.assertRegex(self.approval, r"submitter\s*:\s*approvers")
+        self.assertRegex(self.approval, r"submitterParameter\s*:\s*'CG_PROD_APPROVED_BY'")
+        self.assertRegex(self.approval, r"timeout\(time:\s*30,\s*unit:\s*'MINUTES'\)")
+        self.assertLess(self.approval.index("timeout("), self.approval.index("input("))
+
+    def test_approval_precedes_deploy_prod(self):
+        self.assertLess(self.pipeline.index("stage('Approve Prod')"), self.pipeline.index("stage('Deploy Prod')"))
+        self.assertIn("cgApproveProd()", self.prod_stage("Approve Prod"))
+
+
 class QualityGateTests(unittest.TestCase):
     """HU-05: JaCoCo coverage and the blocking SonarQube quality gate."""
 

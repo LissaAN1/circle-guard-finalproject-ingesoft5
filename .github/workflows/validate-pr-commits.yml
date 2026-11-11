@@ -1,0 +1,52 @@
+name: PR commit convention
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  conventional-commits:
+    name: conventional-commits
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate PR title and new commit subjects
+        shell: bash
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          bash .githooks/validate-commit-subject.sh "$PR_TITLE"
+          base="$(git merge-base "$BASE_SHA" HEAD)"
+          failed=0
+          while IFS= read -r subject; do
+            # Remove only GitHub's trailing PR-number suffix.
+            normalized_subject="$subject"
+
+            if [[ "$normalized_subject" =~ ^(.*)\ \(\#[0-9]+\)$ ]]; then
+              normalized_subject="${BASH_REMATCH[1]}"
+            fi
+
+            if ! bash .githooks/validate-commit-subject.sh "$normalized_subject"; then
+              failed=1
+            fi
+          done < <(git log --no-merges --format=%s "$base..HEAD")
+          exit "$failed"

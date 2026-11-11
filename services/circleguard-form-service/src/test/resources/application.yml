@@ -1,0 +1,15 @@
+# Test-only: in-memory database instead of PostgreSQL + Flyway (the migrations are PostgreSQL-specific).
+spring:
+  datasource:
+    url: jdbc:h2:mem:formtest;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: password
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+  flyway:
+    enabled: false
+  kafka:
+    bootstrap-servers: localhost:9092

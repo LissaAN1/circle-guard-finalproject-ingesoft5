@@ -2,9 +2,9 @@ spring:
   application:
     name: circleguard-auth-service
   datasource:
-    url: jdbc:postgresql://localhost:5432/circleguard_auth
-    username: admin
-    password: password
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/circleguard_auth}
+    username: ${SPRING_DATASOURCE_USERNAME:admin}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -13,18 +13,31 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
   ldap:
-    urls: ldap://localhost:389
+    urls: ${SPRING_LDAP_URLS:ldap://localhost:389}
     base: dc=circleguard,dc=edu
-    username: cn=admin,dc=circleguard,dc=edu
-    password: admin
+    username: ${SPRING_LDAP_USERNAME:cn=admin,dc=circleguard,dc=edu}
+    password: ${SPRING_LDAP_PASSWORD:}
 
 jwt:
-  secret: "my-super-secret-dev-key-32-chars-long-12345678"
+  secret: ${JWT_SECRET:}
   expiration: 3600000
 
 qr:
-  secret: "my-qr-secret-key-for-dev-1234567890"
+  secret: ${QR_SECRET:}
   expiration: 300
 
 server:
   port: 8180
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+identity:
+  api:
+    url: ${IDENTITY_API_URL:http://localhost:8083}

@@ -1,0 +1,10 @@
+.githooks/* text eol=lf
+.github/workflows/*.yml text eol=lf
+infra/**/*.sh text eol=lf
+infra/*.sh text eol=lf
+infra/config.env text eol=lf
+*.sh text eol=lf
+**/Dockerfile text eol=lf
+mobile/nginx.conf text eol=lf
+gradlew text eol=lf
+gradlew.bat text eol=crlf

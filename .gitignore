@@ -3,6 +3,7 @@
 build/
 !**/src/**/build/
 **/build/
+!gradle/wrapper/gradle-wrapper.jar
 
 # Java
 *.class
@@ -46,3 +47,17 @@ web-build/
 *_data/
 pgdata/
 neo4jdata/
+
+# Cloud credentials and key material (never commit)
+*.pem
+*.ppk
+.aws/
+infra/.env
+
+# HU-01: local Python bootstrap/test caches
+__pycache__/
+*.pyc
+
+# HU-02: private per-environment configuration
+infra/environments/.env.*
+!infra/environments/.env.example

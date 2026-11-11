@@ -1,0 +1,5 @@
+name: circleguard-prod
+services:
+  web:
+    labels:
+      com.circleguard.environment: prod

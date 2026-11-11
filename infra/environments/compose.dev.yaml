@@ -1,0 +1,5 @@
+name: circleguard-dev
+services:
+  web:
+    labels:
+      com.circleguard.environment: dev

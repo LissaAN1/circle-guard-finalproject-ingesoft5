@@ -93,12 +93,17 @@ public class HealthStatusService {
                 .bind(threshold).to("threshold")
                 .fetch().one();
 
-        if (result.isPresent()) {
+        // La consulta no devuelve fila cuando el usuario no tiene contactos que cambiar,
+            // aunque el nodo exista y ya haya sido actualizado: se verifica por separado.
+            boolean sourceExists = result.isPresent() || userNodeRepository.existsById(anonymousId);
+            if (sourceExists) {
             Map<String, String> cacheUpdates = new HashMap<>();
             cacheUpdates.put(STATUS_KEY_PREFIX + anonymousId, status);
             
             @SuppressWarnings("unchecked")
-            List<Map<String, String>> affected = (List<Map<String, String>>) result.get().get("affectedContacts");
+            List<Map<String, String>> affected = result
+                        .map(r -> (List<Map<String, String>>) r.get("affectedContacts"))
+                        .orElse(null);
             if (affected != null) {
                 affected.forEach(m -> {
                     if (m != null && m.get("id") != null) {

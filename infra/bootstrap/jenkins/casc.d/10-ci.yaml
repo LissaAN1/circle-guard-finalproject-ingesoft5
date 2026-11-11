@@ -1,0 +1,94 @@
+# HU-04: build agent, shared library and the multibranch pipeline job.
+# Loaded together with ../casc.yaml (HU-01). Secrets arrive as environment variables only.
+jenkins:
+  # Pipelines never run on the controller (numExecutors: 0 in casc.yaml); they run on this node.
+  nodes:
+    - permanent:
+        name: "build-agent"
+        labelString: "docker gradle jdk21"
+        numExecutors: 1
+        remoteFS: "/home/jenkins/agent"
+        retentionStrategy: "always"
+        launcher:
+          inbound:
+            webSocket: true
+
+  globalNodeProperties:
+    - envVars:
+        env:
+          # Empty NEXUS_REGISTRY disables publishing (the pipeline reports it and moves on).
+          - key: "NEXUS_REGISTRY"
+            value: "${NEXUS_REGISTRY:-}"
+          # HU-05: empty SONAR_HOST_URL skips the Analysis stage; set, it runs the blocking quality gate.
+          - key: "SONAR_HOST_URL"
+            value: "${SONAR_HOST_URL:-}"
+          # HU-09: optional webhook for failure notifications (Slack-compatible).
+          - key: "NOTIFY_WEBHOOK_URL"
+            value: "${NOTIFY_WEBHOOK_URL:-}"
+          # HU-08/HU-09: EC2 public IPs for deploy and rollback jobs. Set at bootstrap-ci time.
+          - key: "EC2_DEV_HOST"
+            value: "${EC2_DEV_HOST:-}"
+          - key: "EC2_STAGE_HOST"
+            value: "${EC2_STAGE_HOST:-}"
+          - key: "EC2_PROD_HOST"
+            value: "${EC2_PROD_HOST:-}"
+
+unclassified:
+  location:
+    url: "${JENKINS_PUBLIC_URL:-http://localhost:8080/}"
+
+  globalLibraries:
+    libraries:
+      - name: "circleguard-ci"
+        defaultVersion: ""
+        implicit: false
+        allowVersionOverride: true
+        includeInChangesets: false
+        retriever:
+          modernSCM:
+            libraryPath: "ci/shared-library/"
+            scm:
+              github:
+                id: "circleguard-ci-library"
+                repoOwner: "LissaAN1"
+                repository: "circle-guard-finalproject-ingesoft5"
+                repositoryUrl: "https://github.com/LissaAN1/circle-guard-finalproject-ingesoft5"
+
+security:
+  # The seed script below is trusted, version-controlled configuration.
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false
+
+jobs:
+  - script: |
+      multibranchPipelineJob('circleguard') {
+        displayName('CircleGuard')
+        description('HU-04: validates every push and pull request (build, test, package, publish).')
+        branchSources {
+          github {
+            id('circleguard-github')
+            repoOwner('LissaAN1')
+            repository('circle-guard-finalproject-ingesoft5')
+            scanCredentialsId('github-scan')
+            buildOriginBranch(true)
+            buildOriginBranchWithPR(false)
+            buildOriginPRMerge(true)
+          }
+        }
+        factory {
+          workflowBranchProjectFactory {
+            scriptPath('Jenkinsfile')
+          }
+        }
+        orphanedItemStrategy {
+          discardOldItems {
+            numToKeep(15)
+          }
+        }
+        // Safety net when a webhook is missed.
+        triggers {
+          periodicFolderTrigger {
+            interval('10m')
+          }
+        }
+      }

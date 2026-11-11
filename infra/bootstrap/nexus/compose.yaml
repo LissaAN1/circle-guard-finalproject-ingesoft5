@@ -1,0 +1,19 @@
+name: circleguard-nexus
+
+services:
+  nexus:
+    image: sonatype/nexus3:3.96.2
+    container_name: circleguard-nexus
+    restart: unless-stopped
+    stop_grace_period: 120s
+    environment:
+      INSTALL4J_ADD_VM_PARAMS: "-Xms512m -Xmx1536m -XX:MaxDirectMemorySize=1024m"
+    ports:
+      - "8081:8081"  # Nexus REST/UI, exposed only through TEC-04's SG
+      - "8082:8082"  # Docker hosted connector, configured through REST
+    volumes:
+      - nexus_data:/nexus-data
+
+volumes:
+  nexus_data:
+    name: circleguard_nexus_data

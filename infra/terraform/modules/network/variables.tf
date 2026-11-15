@@ -31,8 +31,13 @@ variable "availability_zones" {
   default     = ["us-east-1a", "us-east-1b"]
 
   validation {
-    condition     = length(var.availability_zones) >= 1
-    error_message = "Provide at least one availability zone."
+    condition     = length(var.availability_zones) >= 2
+    error_message = "Provide at least two availability zones."
+  }
+
+  validation {
+    condition     = length(var.availability_zones) == length(var.public_subnet_cidrs)
+    error_message = "The number of availability zones must match the number of public subnets."
   }
 }
 
@@ -51,6 +56,14 @@ variable "public_ingress_ports" {
   description = "TCP ports exposed to the internet on the cluster security group (web client and gateway)."
   type        = list(number)
   default     = [80, 443]
+
+  validation {
+    condition = alltrue([
+      for p in var.public_ingress_ports :
+      p >= 1 && p <= 65535 && !contains([22, 6443], p)
+    ])
+    error_message = "Public ingress ports must be valid TCP ports and cannot include SSH (22) or the Kubernetes API (6443)."
+  }
 }
 
 variable "tags" {

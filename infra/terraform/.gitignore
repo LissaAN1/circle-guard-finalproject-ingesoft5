@@ -1,0 +1,12 @@
+# Terraform local artifacts: never commit state, plans or provider caches
+**/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+# Variable files may carry account-specific values; commit only *.tfvars.example
+*.tfvars
+!*.tfvars.example

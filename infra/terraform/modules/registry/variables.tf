@@ -56,8 +56,8 @@ variable "max_image_count" {
   default     = 20
 
   validation {
-    condition     = var.max_image_count >= 1
-    error_message = "max_image_count must be at least 1."
+    condition     = var.max_image_count >= 1 && var.max_image_count == floor(var.max_image_count)
+    error_message = "max_image_count must be a positive integer."
   }
 }
 
@@ -65,6 +65,11 @@ variable "force_delete" {
   description = "Allow destroying repositories that still contain images (use true only in dev)."
   type        = bool
   default     = false
+
+  validation {
+    condition     = !var.force_delete || var.environment == "dev"
+    error_message = "force_delete may only be enabled in dev."
+  }
 }
 
 variable "tags" {

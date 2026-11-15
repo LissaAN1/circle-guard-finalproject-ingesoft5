@@ -8,6 +8,20 @@ en un ambiente. Los repositorios se nombran `<name>/<servicio>`.
 - Cifrado en reposo (AES256).
 - Política de ciclo de vida: se conservan solo las últimas `max_image_count` imágenes.
 
+## Propósito y relación con Nexus
+
+Nexus sigue siendo el registro de imágenes de la Parte 1 (Jenkins publica ahí y los
+despliegues actuales lo usan). Este módulo es la pieza reutilizable de registro de
+TEC-09 y **hoy ningún pipeline publica en ECR**. Si la Parte 2 decide usar ECR
+(HU-11/HU-13), antes se acuerda en el equipo:
+
+- **Promoción entre ambientes:** construir una sola vez y desplegar la misma imagen
+  en dev, stage y prod. Con un repositorio compartido por servicio (una sola
+  instancia del módulo) basta con desplegar la misma etiqueta inmutable; con
+  repositorios por ambiente habría que copiar la imagen por digest.
+- **Autenticación:** Jenkins necesitaría un rol IAM con permisos de publicación y
+  los nodos k3s permisos de lectura de ECR (el módulo `compute` aún no los incluye).
+
 ## Variables
 
 | Nombre | Tipo | Por defecto | Descripción |
@@ -17,8 +31,8 @@ en un ambiente. Los repositorios se nombran `<name>/<servicio>`.
 | `services` | list(string) | requerida | Servicios que tendrán repositorio. Sin duplicados, en minúsculas. |
 | `image_tag_mutability` | string | `IMMUTABLE` | `MUTABLE` o `IMMUTABLE`. |
 | `scan_on_push` | bool | `true` | Escanear cada imagen al publicarla. |
-| `max_image_count` | number | `20` | Imágenes recientes que se conservan por repositorio (mínimo 1). |
-| `force_delete` | bool | `false` | Permite destruir repositorios con imágenes (solo para dev). |
+| `max_image_count` | number | `20` | Imágenes recientes que se conservan por repositorio (entero, mínimo 1). |
+| `force_delete` | bool | `false` | Permite destruir repositorios con imágenes. Solo se acepta con `environment = "dev"`. |
 | `tags` | map(string) | `{}` | Etiquetas adicionales. |
 
 ## Requisitos

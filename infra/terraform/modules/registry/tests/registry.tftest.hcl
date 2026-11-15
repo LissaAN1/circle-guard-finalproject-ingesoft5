@@ -91,6 +91,40 @@ run "rejects_zero_image_retention" {
   expect_failures = [var.max_image_count]
 }
 
+run "rejects_fractional_image_retention" {
+  command = plan
+
+  variables {
+    max_image_count = 1.5
+  }
+
+  expect_failures = [var.max_image_count]
+}
+
+run "rejects_force_delete_outside_dev" {
+  command = plan
+
+  variables {
+    environment  = "prod"
+    force_delete = true
+  }
+
+  expect_failures = [var.force_delete]
+}
+
+run "allows_force_delete_in_dev" {
+  command = plan
+
+  variables {
+    force_delete = true
+  }
+
+  assert {
+    condition     = alltrue([for r in aws_ecr_repository.service : r.force_delete])
+    error_message = "force_delete must be honored in dev."
+  }
+}
+
 run "rejects_unknown_environment" {
   command = plan
 

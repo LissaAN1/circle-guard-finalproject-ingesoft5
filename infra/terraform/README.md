@@ -9,7 +9,7 @@ infra/terraform/
   modules/
     network/        VPC, subredes públicas, rutas y security group   (listo)
     compute/        nodos del clúster k3s sobre EC2                  (listo)
-    registry/       repositorios de imágenes                         (pendiente)
+    registry/       repositorios de imágenes ECR                     (listo)
     storage/        almacenamiento                                   (pendiente)
     observability/  logs y métricas                                  (pendiente)
 ```

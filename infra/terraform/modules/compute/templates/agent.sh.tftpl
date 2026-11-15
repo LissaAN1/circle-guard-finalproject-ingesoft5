@@ -1,0 +1,17 @@
+#!/bin/bash
+# k3s agent bootstrap (rendered by Terraform). Runs once as cloud-init user data.
+set -euo pipefail
+
+snap install aws-cli --classic
+
+TOKEN="$(aws ssm get-parameter --region ${region} --name ${token_parameter} \
+  --with-decryption --query Parameter.Value --output text)"
+
+# Wait until the server API answers before joining.
+until curl -ks https://${server_ip}:6443/ping >/dev/null; do
+  sleep 5
+done
+
+curl -sfL https://get.k3s.io | \
+  INSTALL_K3S_VERSION='${k3s_version}' K3S_URL='https://${server_ip}:6443' K3S_TOKEN="$TOKEN" \
+  sh -s - agent

@@ -8,7 +8,7 @@ estado se agregan en HU-10.
 infra/terraform/
   modules/
     network/        VPC, subredes públicas, rutas y security group   (listo)
-    compute/        nodos del clúster                                (pendiente)
+    compute/        nodos del clúster k3s sobre EC2                  (listo)
     registry/       repositorios de imágenes                         (pendiente)
     storage/        almacenamiento                                   (pendiente)
     observability/  logs y métricas                                  (pendiente)

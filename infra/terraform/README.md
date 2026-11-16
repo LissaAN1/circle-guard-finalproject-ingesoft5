@@ -11,7 +11,7 @@ infra/terraform/
     compute/        nodos del clúster k3s sobre EC2                  (listo)
     registry/       repositorios de imágenes ECR                     (listo)
     storage/        bucket S3 privado para artefactos y reportes     (listo)
-    observability/  logs y métricas                                  (pendiente)
+    observability/  logs CloudWatch y alarmas de CPU por SNS         (listo)
 ```
 
 ## Reglas

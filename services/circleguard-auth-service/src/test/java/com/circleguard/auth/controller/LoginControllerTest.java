@@ -1,6 +1,7 @@
 package com.circleguard.auth.controller;
 
 import com.circleguard.auth.client.IdentityClient;
+import com.circleguard.auth.client.IdentityServiceUnavailableException;
 import com.circleguard.auth.service.JwtTokenService;
 import com.circleguard.auth.service.CustomUserDetailsService;
 import com.circleguard.auth.security.SecurityConfig;
@@ -67,5 +68,24 @@ public class LoginControllerTest {
                 .andExpect(jsonPath("$.token").value(token))
                 .andExpect(jsonPath("$.anonymousId").value(anonymousId.toString()))
                 .andExpect(jsonPath("$.type").value("Bearer"));
+    }
+
+    @Test
+    void shouldReturn503WhenIdentityServiceIsUnavailable() throws Exception {
+        // HU-14: the IdentityClient fallback (open circuit or exhausted retries) maps to 503.
+        Authentication auth = Mockito.mock(Authentication.class);
+        Mockito.when(authManager.authenticate(Mockito.any(UsernamePasswordAuthenticationToken.class)))
+                .thenReturn(auth);
+        Mockito.when(identityClient.getAnonymousId("testuser"))
+                .thenThrow(new IdentityServiceUnavailableException("identity-service is unavailable", null));
+
+        mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\": \"testuser\", \"password\": \"password123\"}"))
+                .andExpect(status().isServiceUnavailable())
+                .andExpect(header().string("Retry-After", "15"))
+                .andExpect(jsonPath("$.message").value("Identity service temporarily unavailable, please retry later"));
+
+        Mockito.verifyNoInteractions(jwtService);
     }
 }

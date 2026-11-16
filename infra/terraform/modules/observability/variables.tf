@@ -44,10 +44,10 @@ variable "log_retention_days" {
   }
 }
 
-variable "instance_ids" {
-  description = "EC2 instance ids that get a high-CPU alarm."
-  type        = list(string)
-  default     = []
+variable "instances" {
+  description = "EC2 instances that get a high-CPU alarm, as a map of a static label to the instance id. The labels must be known at plan time; the ids may be computed (for example module.compute.server_instance_id)."
+  type        = map(string)
+  default     = {}
 }
 
 variable "cpu_alarm_threshold" {
@@ -56,9 +56,15 @@ variable "cpu_alarm_threshold" {
   default     = 80
 
   validation {
-    condition     = var.cpu_alarm_threshold > 0 && var.cpu_alarm_threshold <= 100
+    condition     = var.cpu_alarm_threshold >= 1 && var.cpu_alarm_threshold <= 100
     error_message = "cpu_alarm_threshold must be between 1 and 100."
   }
+}
+
+variable "kms_key_arn" {
+  description = "Optional customer-managed KMS key ARN used to encrypt the SNS topic and the log groups. Its policy must allow cloudwatch.amazonaws.com and the logs service to use it. Null keeps the default (no KMS)."
+  type        = string
+  default     = null
 }
 
 variable "alarm_email" {

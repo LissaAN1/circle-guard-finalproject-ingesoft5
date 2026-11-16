@@ -45,7 +45,10 @@ run "creates_cpu_alarm_per_instance" {
   command = plan
 
   variables {
-    instance_ids        = ["i-0abc123", "i-0def456"]
+    instances = {
+      server = "i-0abc123"
+      agent1 = "i-0def456"
+    }
     cpu_alarm_threshold = 70
   }
 
@@ -55,8 +58,45 @@ run "creates_cpu_alarm_per_instance" {
   }
 
   assert {
-    condition     = aws_cloudwatch_metric_alarm.cpu_high["i-0abc123"].threshold == 70
+    condition     = aws_cloudwatch_metric_alarm.cpu_high["server"].threshold == 70
     error_message = "The CPU threshold must be honored."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_metric_alarm.cpu_high["server"].alarm_name == "circleguard-test-cpu-high-server"
+    error_message = "The alarm name must use the instance label."
+  }
+}
+
+# Regression: instance ids that are only known after apply must not break the plan.
+run "accepts_instance_ids_computed_at_apply" {
+  command = plan
+
+  module {
+    source = "./tests/with_computed_instance"
+  }
+
+  assert {
+    condition     = output.alarm_count == 1
+    error_message = "An alarm is expected for an instance whose id is computed at apply."
+  }
+}
+
+run "encrypts_with_kms_when_given" {
+  command = plan
+
+  variables {
+    kms_key_arn = "arn:aws:kms:us-east-1:123456789012:key/11111111-2222-3333-4444-555555555555"
+  }
+
+  assert {
+    condition     = aws_sns_topic.alarms.kms_master_key_id == var.kms_key_arn
+    error_message = "The SNS topic must use the given KMS key."
+  }
+
+  assert {
+    condition     = aws_cloudwatch_log_group.service["auth-service"].kms_key_id == var.kms_key_arn
+    error_message = "The log groups must use the given KMS key."
   }
 }
 
@@ -108,6 +148,16 @@ run "rejects_out_of_range_threshold" {
 
   variables {
     cpu_alarm_threshold = 150
+  }
+
+  expect_failures = [var.cpu_alarm_threshold]
+}
+
+run "rejects_fractional_threshold_below_one" {
+  command = plan
+
+  variables {
+    cpu_alarm_threshold = 0.5
   }
 
   expect_failures = [var.cpu_alarm_threshold]

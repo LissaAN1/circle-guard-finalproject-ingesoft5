@@ -1,6 +1,9 @@
 spring:
   application:
     name: circleguard-auth-service
+  config:
+    # HU-14: Circuit Breaker and Retry settings for the identity-service client.
+    import: classpath:resilience4j.yml
   datasource:
     url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/circleguard_auth}
     username: ${SPRING_DATASOURCE_USERNAME:admin}

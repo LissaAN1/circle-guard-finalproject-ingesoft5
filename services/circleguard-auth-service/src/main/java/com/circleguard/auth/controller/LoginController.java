@@ -2,6 +2,7 @@ package com.circleguard.auth.controller;
 
 import com.circleguard.auth.service.JwtTokenService;
 import com.circleguard.auth.client.IdentityClient;
+import com.circleguard.auth.client.IdentityServiceUnavailableException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.*;
@@ -47,6 +48,12 @@ public class LoginController {
         } catch (org.springframework.security.core.AuthenticationException e) {
             System.err.println("Authentication failed for " + username + ": " + e.getMessage());
             return ResponseEntity.status(401).body(Map.of("message", "Invalid username or password"));
+        } catch (IdentityServiceUnavailableException e) {
+            // HU-14: Circuit Breaker open or retries exhausted; the failure is temporary.
+            System.err.println("Identity service unavailable during login for " + username + ": " + e.getMessage());
+            return ResponseEntity.status(503)
+                    .header("Retry-After", "15")
+                    .body(Map.of("message", "Identity service temporarily unavailable, please retry later"));
         } catch (Exception e) {
             System.err.println("Unexpected error during login for " + username + ":");
             e.printStackTrace();

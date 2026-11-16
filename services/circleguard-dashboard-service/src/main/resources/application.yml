@@ -1,6 +1,9 @@
 spring:
   application:
     name: circleguard-dashboard-service
+  config:
+    # HU-14: Circuit Breaker and Retry settings for the promotion-service client.
+    import: classpath:resilience4j.yml
   datasource:
     url: jdbc:postgresql://localhost:5432/circleguard_dashboard
     username: admin

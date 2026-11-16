@@ -1,0 +1,40 @@
+# HU-14: resilience of the dashboard -> promotion calls (health statistics).
+# Imported from application.yml; the tests import this same file, so they verify these exact values.
+# Every value can be overridden per environment with an environment variable (relaxed binding), e.g.
+# RESILIENCE4J_CIRCUITBREAKER_INSTANCES_PROMOTION_WAITDURATIONINOPENSTATE=60s
+circleguard:
+  promotion-service:
+    http:
+      connect-timeout: ${PROMOTION_CONNECT_TIMEOUT:2s}
+      read-timeout: ${PROMOTION_READ_TIMEOUT:5s}
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      promotion:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        # The rate is evaluated only after 5 calls, so a single failure never opens the circuit.
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        # Aggregating the graph statistics is heavier than a lookup, hence a looser slow-call limit.
+        slow-call-duration-threshold: 4s
+        slow-call-rate-threshold: 80
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 2
+        automatic-transition-from-open-to-half-open-enabled: true
+        # Only infrastructure failures count; a 4xx is a caller error, not an unhealthy promotion-service.
+        record-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException
+  retry:
+    instances:
+      promotion:
+        # 1 call + 2 retries; the statistics endpoints are read-only GETs, so retrying is safe.
+        max-attempts: 3
+        wait-duration: 300ms
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2
+        retry-exceptions:
+          - org.springframework.web.client.ResourceAccessException
+          - org.springframework.web.client.HttpServerErrorException

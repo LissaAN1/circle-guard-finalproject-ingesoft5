@@ -90,6 +90,7 @@ El equipo de Ingeniería de Software V añadió al producto base lo siguiente:
 - Despliegue de `notification`, `file` y `dashboard`. En la Parte 1 estos servicios se compilan, se prueban y se empaquetan, pero no se despliegan.
 - Orquestación con **Kubernetes** e infraestructura como código con **Terraform**.
 - Observabilidad: métricas, logs y trazas.
+- Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)).
 
 ---
 
@@ -172,7 +173,8 @@ CircleGuard follows a **Microservice Architecture** built on a **Hybrid Data Mod
 ├── tests/e2e-playwright/        # [DevOps] Suite E2E (HU-07) y sus runners
 ├── docs/
 │   ├── agil/                    # [DevOps] Documentos ágiles 00–08
-│   └── operaciones/             # [DevOps] Runbooks de pipeline, quality gate, entrega continua y hallazgos
+│   ├── operaciones/             # [DevOps] Runbooks de pipeline, quality gate, entrega continua y hallazgos
+│   └── patrones/                # [DevOps] Patrones de diseño implementados (HU-14 resiliencia, ...)
 ├── .github/                     # [DevOps] Plantilla de PR y workflow de validación de commits
 ├── .githooks/                   # [DevOps] Validación del asunto de los commits
 ├── CHANGELOG.md                 # [DevOps] Release notes (generadas con infra/release/release.sh)

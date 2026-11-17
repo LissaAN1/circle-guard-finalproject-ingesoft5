@@ -1,11 +1,12 @@
 # Infraestructura como código (Parte 2)
 
-Módulos Terraform reutilizables para los ambientes dev, stage y prod de
-CircleGuard (TEC-09). Los ambientes que los consumen y el backend remoto del
-estado se agregan en HU-10.
+Módulos Terraform reutilizables (TEC-09) y los ambientes dev, stage y prod de
+CircleGuard que los consumen, con el estado en un backend remoto (HU-10).
 
 ```text
 infra/terraform/
+  bootstrap/        bucket S3 y tabla DynamoDB del estado remoto     (listo)
+  environments/     dev, stage y prod que arman los cinco módulos    (listo)
   modules/
     network/        VPC, subredes públicas, rutas y security group   (listo)
     compute/        nodos del clúster k3s sobre EC2                  (listo)

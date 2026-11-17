@@ -15,3 +15,20 @@ configMapGenerator:
       - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
     options:
       disableNameSuffixHash: true
+
+patches:
+  # Autoscaling bounds of the dev environment for every HPA.
+  - target: {kind: HorizontalPodAutoscaler}
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  # The Traefik middleware annotation needs the namespace of the environment.
+  - target: {kind: Ingress, name: circleguard-gateway}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares
+        value: circleguard-dev-strip-gateway@kubernetescrd

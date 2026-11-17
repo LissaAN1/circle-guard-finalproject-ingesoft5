@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: file
     app.kubernetes.io/part-of: circleguard
 spec:
-  replicas: 1
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
   selector:
     matchLabels:
       app.kubernetes.io/name: file
@@ -22,15 +22,18 @@ spec:
           ports:
             - name: http
               containerPort: 8085
+          startupProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 90
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
           livenessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 150
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

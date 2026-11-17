@@ -6,10 +6,12 @@ Despliegue de CircleGuard en el clúster k3s de cada ambiente, con [Kustomize](h
 infra/k8s/
   base/
     apps/          8 servicios + web (Deployment, Service, probes y límites)
+    hpa/           un HorizontalPodAutoscaler por servicio y para web (HU-12)
+    ingress.yaml   Ingress de Traefik para web y gateway, y su Middleware (HU-12)
     middleware/    postgres, neo4j, zookeeper, kafka, redis y openldap (StatefulSet con volumen, Service)
     init-db.sql    crea las bases circleguard_* (ConfigMap postgres-init)
   overlays/
-    dev|stage|prod/   namespace circleguard-<ambiente>, ConfigMap y réplicas del ambiente
+    dev|stage|prod/   namespace circleguard-<ambiente>, ConfigMap, límites del HPA y Middleware del ambiente
   lib.sh           selección explícita del clúster y lista de workloads (la usan los dos scripts)
   secrets.sh       crea el Secret circleguard-secrets de un ambiente
   deploy.sh        aplica un ambiente con el registro y la versión indicados
@@ -62,12 +64,27 @@ Los scripts nunca usan el contexto actual de `kubectl`. Actúan sobre `KUBE_CONT
 
 `secrets.sh` no pasa los valores como argumentos (se verían en la lista de procesos): escribe cada uno en un archivo con permisos `0600` dentro de un directorio temporal privado (`0700`, en `$XDG_RUNTIME_DIR` si existe), crea el Secret con `--from-file` y borra el directorio al terminar, también si falla. No imprime valores, así que es seguro en los registros de Jenkins.
 
-## Tamaños por ambiente
+## Exposición y autoescalado (HU-12)
+
+**Ingress.** k3s trae Traefik como controlador de Ingress, así que no se instala nada. Hay dos Ingress de clase `traefik` en el puerto 80 del servidor k3s (el security group de `network` ya lo abre):
+
+| Ruta | Destino | Nota |
+|:---|:---|:---|
+| `/` | `web:80` | Cliente web. |
+| `/gateway` | `gateway:8087` | Un `Middleware` de Traefik (`strip-gateway`) quita el prefijo `/gateway` antes de llegar al servicio. Su anotación lleva el namespace del ambiente (`circleguard-<ambiente>-strip-gateway@kubernetescrd`), que cada overlay fija. |
+
+Sin dominio, se accede por la IP pública del servidor (`server_public_ip` de Terraform): `http://<ip>/` y `http://<ip>/gateway/actuator/health`. Los Ingress no tienen `host`; si más adelante hay DNS, se agrega por overlay. No hay TLS en este avance.
+
+**HPA.** Cada uno de los 8 servicios y `web` tiene un `HorizontalPodAutoscaler` (`autoscaling/v2`) por CPU, con objetivo del 70 % de la solicitud de CPU (`requests.cpu` de cada Deployment). Los Deployment ya no fijan `replicas`: el HPA manda, y así un nuevo `apply` no lo pisa. Sube sin espera (hasta 2 pods cada 30 s) y baja tras 180 s de calma. Requiere metrics-server, que k3s incluye.
 
 | | dev | stage | prod |
 |:---|:---|:---|:---|
-| Réplicas de cada servicio | 1 | 1 | 2 |
-| Middleware | 1 réplica con volumen de 1–5 Gi | igual | igual |
+| Réplicas mínimas por servicio | 1 | 1 | 2 |
+| Réplicas máximas por servicio | 2 | 3 | 5 |
+
+El middleware (postgres, neo4j, zookeeper, kafka, redis y openldap) no escala: 1 réplica con volumen de 1 a 5 Gi en todos los ambientes.
+
+**Sondas.** Los 8 servicios usan el endpoint de Actuator `/actuator/health` en las tres sondas: `startupProbe` (hasta 5 minutos para arrancar, sin penalizar el arranque lento de Spring), `readinessProbe` (saca el pod del Service si deja de responder) y `livenessProbe` (reinicia el contenedor tras 5 fallos seguidos). `web` (nginx) no tiene Actuator y usa `/`.
 
 ## Validación
 
@@ -75,6 +92,19 @@ Los scripts nunca usan el contexto actual de `kubectl`. Actúan sobre `KUBE_CONT
 python infra/k8s/validate.py
 ```
 
-Renderiza los tres overlays con `kubectl kustomize` y revisa los scripts. Comprueba: namespace correcto, cada servicio y cada pieza de middleware con su `Service`, puertos, probes de readiness y liveness, límites de recursos, réplicas del ambiente, que los secretos se lean solo de `circleguard-secrets` que no haya un `Secret` ni valores sensibles en claro, que `deploy.sh` espere a cada workload por nombre y que los scripts fijen el clúster y no pasen secretos como argumentos.
+Renderiza los tres overlays con `kubectl kustomize` y revisa los scripts. Comprueba: namespace correcto, cada servicio y cada pieza de middleware con su `Service`, puertos, las tres sondas (en Actuator para los servicios), límites y solicitud de CPU, un HPA por CPU por servicio con los límites del ambiente y sin `replicas` fijas, los Ingress de `/` (web) y `/gateway` con su Middleware, que los secretos se lean solo de `circleguard-secrets` que no haya un `Secret` ni valores sensibles en claro, que `deploy.sh` espere a cada workload por nombre y que los scripts fijen el clúster y no pasen secretos como argumentos.
 
-**Alcance de esta entrega:** los manifiestos están definidos y validados de forma estática. **No se han aplicado todavía en un clúster k3s real**: la verificación de que los pods quedan `Running` y se comunican (PI-114) se hará al desplegar los ambientes en AWS, junto con la verificación real de HU-10. Quedan por acordar con el equipo: el registro de imágenes (Nexus), y cómo llega Jenkins a la API de cada clúster (ver `infra/terraform/environments/README.md`).
+**Alcance de esta entrega:** los manifiestos están definidos y validados de forma estática; el comportamiento real del Ingress y del escalado (PI-117) se comprueba en un k3s desplegado, abajo se indica cómo. **No se han aplicado todavía en un clúster k3s real**: la verificación de que los pods quedan `Running` y se comunican (PI-114) se hará al desplegar los ambientes en AWS, junto con la verificación real de HU-10. Quedan por acordar con el equipo: el registro de imágenes (Nexus), y cómo llega Jenkins a la API de cada clúster (ver `infra/terraform/environments/README.md`).
+
+## Verificar el escalado en un clúster (PI-117)
+
+Con el ambiente desplegado y `KUBE_CONTEXT` apuntando a él:
+
+```bash
+kubectl --context circleguard-dev -n circleguard-dev get hpa                     # TARGETS debe mostrar un % de CPU, no <unknown>
+curl -s http://<server_public_ip>/gateway/actuator/health                         # {"status":"UP"} a través del Ingress
+kubectl --context circleguard-dev -n circleguard-dev run carga --rm -it --image=busybox:1.36 --restart=Never --   sh -c 'while true; do wget -q -O- http://gateway:8087/actuator/health >/dev/null; done'   # genera carga
+kubectl --context circleguard-dev -n circleguard-dev get hpa gateway -w          # las réplicas suben y, al parar la carga, bajan tras ~3 min
+```
+
+Esta verificación requiere el despliegue real en AWS y queda pendiente igual que PI-114.

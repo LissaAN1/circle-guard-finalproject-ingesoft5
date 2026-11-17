@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: auth
     app.kubernetes.io/part-of: circleguard
 spec:
-  replicas: 1
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
   selector:
     matchLabels:
       app.kubernetes.io/name: auth
@@ -34,15 +34,18 @@ spec:
             - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: JWT_SECRET}}}
             - {name: QR_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: QR_SECRET}}}
             - {name: APP_CORS_ALLOWED_ORIGINS, valueFrom: {configMapKeyRef: {name: circleguard-config, key: APP_CORS_ALLOWED_ORIGINS}}}
+          startupProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 90
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
           livenessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 150
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

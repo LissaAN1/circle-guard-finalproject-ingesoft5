@@ -19,6 +19,16 @@ resources:
   - middleware/kafka.yaml
   - middleware/redis.yaml
   - middleware/openldap.yaml
+  - hpa/auth.yaml
+  - hpa/identity.yaml
+  - hpa/promotion.yaml
+  - hpa/form.yaml
+  - hpa/gateway.yaml
+  - hpa/dashboard.yaml
+  - hpa/file.yaml
+  - hpa/notification.yaml
+  - hpa/web.yaml
+  - ingress.yaml
 
 configMapGenerator:
   - name: postgres-init

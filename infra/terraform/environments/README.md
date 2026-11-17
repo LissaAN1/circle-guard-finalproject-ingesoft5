@@ -40,7 +40,26 @@ terraform plan
 terraform apply
 ```
 
-Aplicar crea recursos con costo en AWS (instancias EC2, volúmenes). Los ambientes `stage` y `prod` quedan definidos y validados, pero no hace falta aplicarlos para esta entrega.
+Aplicar crea recursos con costo en AWS (instancias EC2, volúmenes).
+
+## Estado de la validación
+
+En este avance de HU-10 los tres ambientes solo se validaron con `fmt`, `validate` y pruebas de plan con proveedores simulados; **no se aplicó ninguno en AWS**. Eso no sustituye la validación real: aplicar `dev`, `stage` y `prod` (con el backend ya creado) y comprobar que el clúster de cada uno levanta **sigue pendiente y es necesario para completar la Parte 2**. No se omite para `stage` ni `prod`.
+
+## Registro de imágenes: Nexus y ECR
+
+**Nexus sigue siendo el registro principal de imágenes**: es el que usa Jenkins hoy y el que se propone mantener para HU-13. Los repositorios ECR que cada ambiente aprovisiona son la pieza reutilizable de registro de TEC-09 y **ningún pipeline publica en ECR todavía**, de modo que no hay dos fuentes de imágenes en uso. Si el equipo decide usar ECR más adelante, antes hay que acordar la promoción entre ambientes y la autenticación de Jenkins y de los nodos k3s; ambos puntos están descritos en el [README del módulo `registry`](../modules/registry/README.md#propósito-y-relación-con-nexus). Esta decisión queda por confirmar en el equipo antes de HU-13.
+
+## Acceso de Jenkins a la API de Kubernetes (propuesta para HU-13)
+
+Cada ambiente tiene su propia VPC (`10.0.0.0/16`, `10.1.0.0/16`, `10.2.0.0/16`), distinta de la red donde corre Jenkins, así que Jenkins no llega a la API de k3s (puerto 6443) por red privada. Este PR no implementa la integración; propone el mecanismo para acordarlo:
+
+1. **Abrir 6443 solo a Jenkins.** Agregar la IP pública de Jenkins, como `/32`, a `admin_cidrs` de cada ambiente (en `terraform.tfvars`, que git ignora). Ninguna otra dirección llega a la API. Limitación actual: el módulo `network` abre con la misma lista el SSH (22) y la API (6443); separarlas es un cambio pequeño del módulo si se quiere dar a Jenkins solo la API.
+2. **IP estable.** La IP pública de una instancia cambia al apagarla y encenderla; hay que asignar una Elastic IP a Jenkins o actualizar `admin_cidrs` cada vez, porque si no el acceso se rompe en silencio.
+3. **Credencial de mínimo privilegio.** Jenkins no usa el kubeconfig de administrador: usa el token de una ServiceAccount limitada a los espacios de nombres de la aplicación (HU-11), guardado como credencial de Jenkins y distinta por ambiente.
+4. **Alternativa más cerrada.** Emparejar la VPC de Jenkins con cada ambiente (VPC peering; los rangos no se solapan) y llegar por IP privada sin abrir 6443 a Internet. Requiere rutas y reglas de security group que el módulo `network` aún no tiene.
+
+Se propone la opción 1 con 2 y 3 para HU-13 por ser la más simple, y dejar la opción 4 como endurecimiento. Falta acordarlo en el equipo.
 
 ## Pruebas
 

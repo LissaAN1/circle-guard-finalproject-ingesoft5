@@ -31,7 +31,8 @@ Se aplican dos patrones de Resilience4j a cada llamada, configurados por instanc
     lugar de un `500` genérico.
   - En **dashboard**, que es de solo lectura, el fallback devuelve una respuesta degradada
     (`{"error": "Service unavailable", "degraded": true, "timestamp": ...}`) que conserva el contrato
-    anterior. La HU-16 (cache-aside) la reemplazará por el último valor almacenado.
+    anterior. Con la HU-16 ([cache-aside](cache-aside-dashboard.md)), si hay un valor guardado en Redis se
+    responde con él en lugar de la respuesta degradada.
 - **Timeouts:** cada cliente tiene su `RestTemplate` con timeouts de conexión y de lectura
   (`IdentityClientConfig` y `PromotionClientConfig`). Sin ellos, el Circuit Breaker nunca vería las fallas
   por cuelgue.
@@ -76,7 +77,7 @@ imagen:
 | Un servicio caído ya no arrastra a quien lo llama: con el circuito abierto, la respuesta es inmediata. | Durante la ventana abierta (15 s o 30 s) se rechazan llamadas aunque el servicio ya se haya recuperado. |
 | Se deja de enviar tráfico a un servicio degradado, lo que le da margen para recuperarse. | Los reintentos multiplican hasta por 3 la carga sobre un servicio que empieza a fallar; el backoff y el circuito la limitan. |
 | El cliente recibe un error claro y temporal (503 con `Retry-After`) en lugar de un 500 genérico. | Reintentar solo es seguro en operaciones idempotentes. `POST /identities/map` lo es (la misma identidad siempre da el mismo `anonymousId`) y las estadísticas son `GET`; una operación nueva que no lo sea no debe reutilizar esta configuración. |
-| El dashboard sigue respondiendo con promotion caído. | La respuesta degradada no tiene datos; hace falta la HU-16 para servir el último valor conocido. |
+| El dashboard sigue respondiendo con promotion caído. | La respuesta degradada no tiene datos; la HU-16 ([cache-aside](cache-aside-dashboard.md)) sirve el último valor conocido cuando lo hay. |
 | Umbrales, tiempos y timeouts se ajustan por variable de entorno. | Hay más parámetros que calibrar; valores mal elegidos abren el circuito por ruido (muy sensibles) o no lo abren nunca (muy laxos). `minimum-number-of-calls: 5` evita que una sola falla lo abra. |
 
 **Decisiones explícitas:**

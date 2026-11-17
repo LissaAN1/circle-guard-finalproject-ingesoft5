@@ -15,6 +15,9 @@ infra/terraform/
     observability/  logs CloudWatch y alarmas de CPU por SNS         (listo)
 ```
 
+Diagramas de la arquitectura, los módulos, el estado remoto y las redes:
+[`infra/docs/terraform-architecture.md`](../docs/terraform-architecture.md).
+
 ## Reglas
 
 - Ninguna credencial, llave ni estado en el repositorio (`.gitignore` lo impide).

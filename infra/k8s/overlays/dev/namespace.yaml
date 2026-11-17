@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: circleguard-dev
+  labels:
+    app.kubernetes.io/part-of: circleguard
+    circleguard/environment: dev

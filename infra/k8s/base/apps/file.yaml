@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: file
+  labels:
+    app.kubernetes.io/name: file
+    app.kubernetes.io/part-of: circleguard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: file
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: file
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      containers:
+        - name: file
+          image: circleguard-file-service
+          ports:
+            - name: http
+              containerPort: 8085
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            initialDelaySeconds: 150
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: file
+  labels:
+    app.kubernetes.io/name: file
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: file
+  ports:
+    - name: http
+      port: 8085
+      targetPort: http

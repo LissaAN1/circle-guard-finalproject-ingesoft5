@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth
+  labels:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/part-of: circleguard
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: auth
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: auth
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      containers:
+        - name: auth
+          image: circleguard-auth-service
+          ports:
+            - name: http
+              containerPort: 8180
+          env:
+            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/circleguard_auth"}
+            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_USER}}}
+            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_PASSWORD}}}
+            - {name: SPRING_LDAP_URLS, value: "ldap://openldap:389"}
+            - {name: SPRING_LDAP_BASE, value: "dc=circleguard,dc=edu"}
+            - {name: SPRING_LDAP_USERNAME, value: "cn=admin,dc=circleguard,dc=edu"}
+            - {name: SPRING_LDAP_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: LDAP_ADMIN_PASSWORD}}}
+            - {name: IDENTITY_API_URL, value: "http://identity:8083"}
+            - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: JWT_SECRET}}}
+            - {name: QR_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: QR_SECRET}}}
+            - {name: APP_CORS_ALLOWED_ORIGINS, valueFrom: {configMapKeyRef: {name: circleguard-config, key: APP_CORS_ALLOWED_ORIGINS}}}
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            initialDelaySeconds: 150
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth
+  labels:
+    app.kubernetes.io/name: auth
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: auth
+  ports:
+    - name: http
+      port: 8180
+      targetPort: http

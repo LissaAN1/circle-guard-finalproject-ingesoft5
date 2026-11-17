@@ -1,0 +1,9 @@
+# Copy to terraform.tfvars (git ignores it) and adjust.
+# Operator IPs allowed to reach SSH and the Kubernetes API, in CIDR form.
+admin_cidrs = ["203.0.113.10/32"]
+
+# Existing EC2 key pair for SSH (optional).
+# key_name = "circleguard-key"
+
+# Email for alarm notifications (optional; AWS sends a confirmation message).
+# alarm_email = "ops@example.com"

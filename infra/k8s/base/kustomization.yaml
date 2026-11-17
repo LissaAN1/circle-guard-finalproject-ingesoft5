@@ -1,0 +1,36 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Shared definition of the whole CircleGuard stack. Each overlay picks the
+# namespace, the image registry/tag and the replica counts of one environment.
+resources:
+  - apps/auth.yaml
+  - apps/identity.yaml
+  - apps/promotion.yaml
+  - apps/form.yaml
+  - apps/gateway.yaml
+  - apps/dashboard.yaml
+  - apps/file.yaml
+  - apps/notification.yaml
+  - apps/web.yaml
+  - middleware/postgres.yaml
+  - middleware/neo4j.yaml
+  - middleware/zookeeper.yaml
+  - middleware/kafka.yaml
+  - middleware/redis.yaml
+  - middleware/openldap.yaml
+
+configMapGenerator:
+  - name: postgres-init
+    files:
+      - init-db.sql
+    options:
+      disableNameSuffixHash: true
+  - name: circleguard-config
+    literals:
+      - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
+    options:
+      disableNameSuffixHash: true
+
+# Images carry no registry here: deploy.sh sets REGISTRY and APP_VERSION at
+# deploy time (kustomize edit set image) so nothing environment-specific is committed.

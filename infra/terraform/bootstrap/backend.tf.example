@@ -1,0 +1,16 @@
+# Copy to backend.tf AFTER the first apply, then run:
+#
+#   terraform init -migrate-state \
+#     -backend-config="bucket=<state_bucket_name>" \
+#     -backend-config="dynamodb_table=<lock_table_name>"
+#
+# This moves the bootstrap's own state into the bucket it created, so nobody
+# has to keep a local terraform.tfstate. backend.tf is ignored by git on
+# purpose: the first run in a fresh account must work without it.
+terraform {
+  backend "s3" {
+    key     = "bootstrap/terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
+  }
+}

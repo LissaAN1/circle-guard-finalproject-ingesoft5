@@ -7,9 +7,37 @@ Crea lo necesario para que los ambientes (dev, stage, prod) guarden su estado de
 
 Cada ambiente usa una `key` distinta dentro del mismo bucket (`dev/terraform.tfstate`, `stage/terraform.tfstate`, `prod/terraform.tfstate`), de modo que sus estados no se mezclan.
 
-## Por qué esta carpeta usa estado local
+## Quién custodia el estado del bootstrap
 
-Un ambiente no puede guardar su estado en un bucket que todavía no existe. Por eso esta configuración se aplica **una sola vez**, con estado local, antes de cualquier ambiente. Después casi no cambia. Su estado local (`terraform.tfstate`) no se versiona: el `.gitignore` lo excluye. Guárdalo con quien aplicó el bootstrap o impórtalo después con `terraform import` si hace falta.
+Un ambiente no puede guardar su estado en un bucket que todavía no existe. Por eso el **primer** `apply` de esta carpeta usa estado local. Para que nadie tenga que custodiar ese archivo, el procedimiento termina **migrando el estado del propio bootstrap al bucket que acaba de crear**:
+
+1. Quien aplica (con las credenciales AWS de la cuenta del proyecto) ejecuta `terraform init` y `terraform apply`. Aparece un `terraform.tfstate` local; el `.gitignore` lo excluye y no debe copiarse ni enviarse por ningún canal.
+2. En seguida, en la misma sesión, se migra:
+   ```bash
+   cp backend.tf.example backend.tf
+   terraform init -migrate-state \
+     -backend-config="bucket=$(terraform output -raw state_bucket_name)" \
+     -backend-config="dynamodb_table=$(terraform output -raw lock_table_name)"
+   ```
+   Responde `yes` a la pregunta de copiar el estado. El estado queda en `s3://<bucket>/bootstrap/terraform.tfstate`, cifrado, versionado y con bloqueo en DynamoDB.
+3. Se borran los archivos locales: `rm terraform.tfstate terraform.tfstate.backup`. `backend.tf` también queda fuera de git (el `.gitignore` lo excluye), de modo que el primer `apply` en una cuenta nueva siga funcionando sin él.
+
+**Dónde vive el estado y quién puede recuperarlo.** Después del paso 2 el único estado válido está en el bucket. Cualquier integrante con credenciales de la cuenta puede recuperarlo repitiendo `cp backend.tf.example backend.tf` y `terraform init -backend-config=...` (con el nombre del bucket y de la tabla, que no son secretos y se ven en la consola de AWS). Las versiones anteriores se conservan 90 días, así que un estado dañado se restaura desde el historial de versiones del objeto `bootstrap/terraform.tfstate`.
+
+**Si el estado se pierde antes de migrarlo** (se borró el archivo local en el paso 1), no se pierde infraestructura: se vuelve a `terraform init` y se importan los recursos existentes, y el siguiente `plan` debe salir sin cambios:
+
+```bash
+terraform import 'module.state_bucket.aws_s3_bucket.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_public_access_block.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_ownership_controls.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_server_side_encryption_configuration.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_versioning.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_lifecycle_configuration.this' <state_bucket_name>
+terraform import 'module.state_bucket.aws_s3_bucket_policy.tls_only' <state_bucket_name>
+terraform import 'aws_dynamodb_table.lock' <lock_table_name>
+```
+
+Si se borra el bucket entero, los estados de los ambientes se pierden con él: por eso el bucket está versionado y la política del módulo `storage` no permite `force_destroy` fuera de `dev`.
 
 ## Variables
 
@@ -36,6 +64,7 @@ cd infra/terraform/bootstrap
 terraform init
 terraform apply          # crea el bucket y la tabla (requiere credenciales AWS)
 terraform output -raw backend_config
+# y enseguida migra el estado del bootstrap al bucket (ver "Quién custodia el estado del bootstrap")
 ```
 
 Luego, en cada ambiente, `terraform init -backend-config=backend.hcl` con esos valores y la `key` del ambiente (ver el README de `environments/`).

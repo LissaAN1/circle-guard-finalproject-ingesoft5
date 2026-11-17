@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: promotion
     app.kubernetes.io/part-of: circleguard
 spec:
-  replicas: 1
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
   selector:
     matchLabels:
       app.kubernetes.io/name: promotion
@@ -36,15 +36,18 @@ spec:
             - {name: SPRING_DATA_REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
             - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
             - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: JWT_SECRET}}}
+          startupProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
           readinessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 90
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 6
+            failureThreshold: 3
           livenessProbe:
             httpGet: {path: /actuator/health, port: http}
-            initialDelaySeconds: 150
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

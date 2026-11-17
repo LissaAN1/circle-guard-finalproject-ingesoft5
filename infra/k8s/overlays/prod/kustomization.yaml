@@ -15,49 +15,20 @@ configMapGenerator:
       - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
     options:
       disableNameSuffixHash: true
+
 patches:
-  - target: {kind: Deployment, name: auth}
+  # Autoscaling bounds of the prod environment for every HPA.
+  - target: {kind: HorizontalPodAutoscaler}
     patch: |-
       - op: replace
-        path: /spec/replicas
+        path: /spec/minReplicas
         value: 2
-  - target: {kind: Deployment, name: identity}
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+  # The Traefik middleware annotation needs the namespace of the environment.
+  - target: {kind: Ingress, name: circleguard-gateway}
     patch: |-
       - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: promotion}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: form}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: gateway}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: dashboard}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: file}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: notification}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
-  - target: {kind: Deployment, name: web}
-    patch: |-
-      - op: replace
-        path: /spec/replicas
-        value: 2
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares
+        value: circleguard-prod-strip-gateway@kubernetescrd

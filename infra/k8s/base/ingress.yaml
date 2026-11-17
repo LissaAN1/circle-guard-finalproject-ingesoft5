@@ -1,0 +1,54 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: circleguard-web
+  labels:
+    app.kubernetes.io/name: circleguard-web
+    app.kubernetes.io/part-of: circleguard
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port: {number: 80}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: circleguard-gateway
+  labels:
+    app.kubernetes.io/name: circleguard-gateway
+    app.kubernetes.io/part-of: circleguard
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: web
+    # Namespace-qualified; each overlay sets the real namespace (see overlays).
+    traefik.ingress.kubernetes.io/router.middlewares: NAMESPACE-strip-gateway@kubernetescrd
+spec:
+  ingressClassName: traefik
+  rules:
+    - http:
+        paths:
+          - path: /gateway
+            pathType: Prefix
+            backend:
+              service:
+                name: gateway
+                port: {number: 8087}
+---
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: strip-gateway
+  labels:
+    app.kubernetes.io/part-of: circleguard
+spec:
+  stripPrefix:
+    prefixes:
+      - /gateway

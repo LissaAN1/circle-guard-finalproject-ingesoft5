@@ -6,7 +6,7 @@ metadata:
     app.kubernetes.io/name: web
     app.kubernetes.io/part-of: circleguard
 spec:
-  replicas: 1
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
   selector:
     matchLabels:
       app.kubernetes.io/name: web
@@ -31,15 +31,18 @@ spec:
             - {name: DASHBOARD_BASE_URL, value: "/dashboard"}
             - {name: FILE_BASE_URL, value: "/file"}
             - {name: NOTIFICATION_BASE_URL, value: "/notification"}
-          readinessProbe:
+          startupProbe:
             httpGet: {path: /, port: http}
-            initialDelaySeconds: 10
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 6
+          readinessProbe:
+            httpGet: {path: /, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
           livenessProbe:
             httpGet: {path: /, port: http}
-            initialDelaySeconds: 70
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

@@ -14,7 +14,7 @@ APPS = {"auth": 8180, "identity": 8083, "promotion": 8088, "form": 8086, "gatewa
 MIDDLEWARE = {"postgres": 5432, "neo4j": 7687, "zookeeper": 2181, "kafka": 9092, "redis": 6379, "openldap": 389}
 SECRET_KEYS = {"DB_USER", "DB_PASSWORD", "NEO4J_PASSWORD", "LDAP_ADMIN_PASSWORD", "REDIS_PASSWORD",
                "JWT_SECRET", "QR_SECRET", "VAULT_SECRET", "VAULT_SALT", "VAULT_HASH_SALT"}
-REPLICAS = {"dev": 1, "stage": 1, "prod": 2}
+HPA_BOUNDS = {"dev": (1, 2), "stage": (1, 3), "prod": (2, 5)}  # (min, max) replicas
 failures = []
 
 
@@ -46,8 +46,21 @@ for env in ("dev", "stage", "prod"):
         c = workload["spec"]["template"]["spec"]["containers"][0]
         if name in APPS:
             check(c["ports"][0]["containerPort"] == port, f"{env}: {name} port != {port}")
-            check("readinessProbe" in c and "livenessProbe" in c, f"{env}: {name} lacks probes")
-            check(workload["spec"]["replicas"] == REPLICAS[env], f"{env}: {name} replicas != {REPLICAS[env]}")
+            for probe in ("startupProbe", "readinessProbe", "livenessProbe"):
+                check(probe in c, f"{env}: {name} lacks {probe}")
+                if name != "web" and probe in c:
+                    check(c[probe]["httpGet"]["path"] == "/actuator/health", f"{env}: {name} {probe} is not on Actuator")
+            check("replicas" not in workload["spec"], f"{env}: {name} fixes replicas; the HPA must own the count")
+            # HU-12: one CPU-based HPA per service and for the web client.
+            hpa = kinds.get("HorizontalPodAutoscaler", {}).get(name)
+            check(hpa is not None, f"{env}: HPA for {name} missing")
+            if hpa:
+                spec = hpa["spec"]
+                check(spec["scaleTargetRef"]["kind"] == "Deployment" and spec["scaleTargetRef"]["name"] == name,
+                      f"{env}: HPA {name} targets the wrong workload")
+                check(any(m.get("resource", {}).get("name") == "cpu" for m in spec["metrics"]), f"{env}: HPA {name} is not CPU based")
+                check((spec["minReplicas"], spec["maxReplicas"]) == HPA_BOUNDS[env], f"{env}: HPA {name} bounds != {HPA_BOUNDS[env]}")
+                check("requests" in c.get("resources", {}) and "cpu" in c["resources"]["requests"], f"{env}: {name} has no CPU request for its HPA")
         check("limits" in c.get("resources", {}), f"{env}: {name} lacks resource limits")
     for name, d in kinds.get("Deployment", {}).items():
         for e in d["spec"]["template"]["spec"]["containers"][0].get("env", []):
@@ -62,6 +75,22 @@ for env in ("dev", "stage", "prod"):
     # Hostnames the web nginx proxies to must exist as Services.
     for host in ("auth", "identity", "promotion", "form", "gateway"):
         check(host in services, f"{env}: nginx upstream {host} has no Service")
+    # HU-12: the Ingress exposes the web client and the gateway through Traefik (k3s).
+    ingresses = kinds.get("Ingress", {})
+    routes = {}
+    for ing in ingresses.values():
+        check(ing["spec"].get("ingressClassName") == "traefik", f"{env}: Ingress {ing['metadata']['name']} is not for traefik")
+        for rule in ing["spec"]["rules"]:
+            for p in rule["http"]["paths"]:
+                routes[p["path"]] = p["backend"]["service"]["name"]
+    check(routes.get("/") == "web", f"{env}: Ingress does not expose the web client on /")
+    check(routes.get("/gateway") == "gateway", f"{env}: Ingress does not expose the gateway on /gateway")
+    gw = ingresses.get("circleguard-gateway")
+    if gw:
+        want = f"{ns}-strip-gateway@kubernetescrd"
+        check(gw["metadata"]["annotations"].get("traefik.ingress.kubernetes.io/router.middlewares") == want,
+              f"{env}: gateway Ingress middleware is not {want}")
+    check("strip-gateway" in kinds.get("Middleware", {}), f"{env}: Middleware strip-gateway missing")
     print(f"{env}: {len(docs)} objects, namespace {ns}")
 
 # Scripts: lib.sh lists the workloads deploy.sh waits for, and the secrets never

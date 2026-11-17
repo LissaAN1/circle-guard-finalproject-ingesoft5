@@ -10,6 +10,7 @@ infra/k8s/
     init-db.sql    crea las bases circleguard_* (ConfigMap postgres-init)
   overlays/
     dev|stage|prod/   namespace circleguard-<ambiente>, ConfigMap y réplicas del ambiente
+  lib.sh           selección explícita del clúster y lista de workloads (la usan los dos scripts)
   secrets.sh       crea el Secret circleguard-secrets de un ambiente
   deploy.sh        aplica un ambiente con el registro y la versión indicados
   validate.py      verificación sin clúster de los tres ambientes
@@ -51,7 +52,15 @@ bash infra/k8s/deploy.sh dev <registro> <versión>
 kubectl -n circleguard-dev get pods
 ```
 
-`deploy.sh` aplica el overlay y espera a que todos los StatefulSet y Deployment estén listos. Todo ocurre en el clúster del ambiente (`kubectl` apuntando al k3s correspondiente, por ejemplo con su kubeconfig).
+`deploy.sh` aplica el overlay y espera, uno por uno y por nombre, a los 6 StatefulSet y los 9 Deployment (`kubectl rollout status statefulset/<nombre>` y `deployment/<nombre>`). Si alguno no queda listo en 10 minutos el script termina con código distinto de cero, de modo que un pipeline pueda detener la promoción. La lista de workloads está en `lib.sh` y `validate.py` comprueba que coincida con lo que renderizan los manifiestos.
+
+### Clúster de destino
+
+Los scripts nunca usan el contexto actual de `kubectl`. Actúan sobre `KUBE_CONTEXT` (por defecto `circleguard-<ambiente>`) y se niegan a continuar si ese contexto no existe, si su nombre no corresponde al ambiente pedido o si corresponde a otro ambiente (por ejemplo, `circleguard-dev` al desplegar `prod`). Cada comando `kubectl` lleva `--context` explícito. Para otro nombre de contexto: `KUBECONFIG=/ruta/kubeconfig-prod KUBE_CONTEXT=mi-clúster-prod bash infra/k8s/deploy.sh prod ...`; el nombre debe contener el ambiente (`prod`) como palabra.
+
+### Secretos
+
+`secrets.sh` no pasa los valores como argumentos (se verían en la lista de procesos): escribe cada uno en un archivo con permisos `0600` dentro de un directorio temporal privado (`0700`, en `$XDG_RUNTIME_DIR` si existe), crea el Secret con `--from-file` y borra el directorio al terminar, también si falla. No imprime valores, así que es seguro en los registros de Jenkins.
 
 ## Tamaños por ambiente
 
@@ -66,6 +75,6 @@ kubectl -n circleguard-dev get pods
 python infra/k8s/validate.py
 ```
 
-Renderiza los tres overlays con `kubectl kustomize` y comprueba: namespace correcto, cada servicio y cada pieza de middleware con su `Service`, puertos, probes de readiness y liveness, límites de recursos, réplicas del ambiente, que los secretos se lean solo de `circleguard-secrets` y que no haya un `Secret` ni valores sensibles en claro.
+Renderiza los tres overlays con `kubectl kustomize` y revisa los scripts. Comprueba: namespace correcto, cada servicio y cada pieza de middleware con su `Service`, puertos, probes de readiness y liveness, límites de recursos, réplicas del ambiente, que los secretos se lean solo de `circleguard-secrets` que no haya un `Secret` ni valores sensibles en claro, que `deploy.sh` espere a cada workload por nombre y que los scripts fijen el clúster y no pasen secretos como argumentos.
 
 **Alcance de esta entrega:** los manifiestos están definidos y validados de forma estática. **No se han aplicado todavía en un clúster k3s real**: la verificación de que los pods quedan `Running` y se comunican (PI-114) se hará al desplegar los ambientes en AWS, junto con la verificación real de HU-10. Quedan por acordar con el equipo: el registro de imágenes (Nexus), y cómo llega Jenkins a la API de cada clúster (ver `infra/terraform/environments/README.md`).

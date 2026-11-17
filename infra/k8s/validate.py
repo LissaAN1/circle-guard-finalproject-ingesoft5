@@ -64,6 +64,24 @@ for env in ("dev", "stage", "prod"):
         check(host in services, f"{env}: nginx upstream {host} has no Service")
     print(f"{env}: {len(docs)} objects, namespace {ns}")
 
+# Scripts: lib.sh lists the workloads deploy.sh waits for, and the secrets never
+# travel as command-line arguments.
+lib = (HERE / "lib.sh").read_text()
+deploy = (HERE / "deploy.sh").read_text()
+secrets = (HERE / "secrets.sh").read_text()
+sts = re.search(r"WORKLOAD_STATEFULSETS=\((.*?)\)", lib).group(1).split()
+dep = re.search(r"WORKLOAD_DEPLOYMENTS=\((.*?)\)", lib).group(1).split()
+check(set(dep) == set(APPS), "lib.sh WORKLOAD_DEPLOYMENTS differs from the application Deployments")
+check(set(sts) == set(MIDDLEWARE), "lib.sh WORKLOAD_STATEFULSETS differs from the middleware StatefulSets")
+check('rollout status "statefulset/$app"' in deploy and 'rollout status "deployment/$app"' in deploy,
+      "deploy.sh must wait for each workload by name")
+check(not re.search(r"rollout status (statefulset|deployment) --", deploy), "deploy.sh has a rollout status without a resource")
+check("--from-literal" not in secrets and "--from-file" in secrets, "secrets.sh must not pass secret values as arguments")
+for name, text in (("deploy.sh", deploy), ("secrets.sh", secrets)):
+    check("select_cluster" in text, f"{name} does not pin the cluster with select_cluster")
+    check(not re.search(r"^\s*kubectl", text, re.M), f"{name} calls kubectl without the pinned context (use kc)")
+print("scripts: workloads, secrets and cluster selection checked")
+
 if failures:
     print("\n".join("FAIL " + f for f in failures))
     sys.exit(1)

@@ -3,7 +3,7 @@
 
 Usage: python infra/k8s/validate.py   (needs kubectl for `kubectl kustomize`)
 """
-import re, subprocess, sys
+import re, subprocess, sys, tempfile
 from pathlib import Path
 
 import yaml
@@ -15,6 +15,7 @@ MIDDLEWARE = {"postgres": 5432, "neo4j": 7687, "zookeeper": 2181, "kafka": 9092,
 SECRET_KEYS = {"DB_USER", "DB_PASSWORD", "NEO4J_PASSWORD", "LDAP_ADMIN_PASSWORD", "REDIS_PASSWORD",
                "JWT_SECRET", "QR_SECRET", "VAULT_SECRET", "VAULT_SALT", "VAULT_HASH_SALT"}
 HPA_BOUNDS = {"dev": (1, 2), "stage": (1, 3), "prod": (2, 5)}  # (min, max) replicas
+FEATURE_TOGGLES = {"FEATURE_DENY_SUSPECT_ENTRY": "gateway"}  # HU-15: toggle -> Deployment that reads it
 failures = []
 
 
@@ -23,12 +24,23 @@ def check(cond, msg):
         failures.append(msg)
 
 
+def render(path):
+    out = subprocess.run(["kubectl", "kustomize", str(path)], capture_output=True, text=True)
+    return out.returncode, out.stderr.strip(), [d for d in yaml.safe_load_all(out.stdout) if d] if not out.returncode else []
+
+
+def by_kind(docs):
+    kinds = {}
+    for d in docs:
+        kinds.setdefault(d["kind"], {})[d["metadata"]["name"]] = d
+    return kinds
+
+
 for env in ("dev", "stage", "prod"):
-    out = subprocess.run(["kubectl", "kustomize", str(HERE / "overlays" / env)], capture_output=True, text=True)
-    if out.returncode:
-        failures.append(f"{env}: kustomize failed: {out.stderr.strip()}")
+    code, err, docs = render(HERE / "overlays" / env)
+    if code:
+        failures.append(f"{env}: kustomize failed: {err}")
         continue
-    docs = [d for d in yaml.safe_load_all(out.stdout) if d]
     ns = f"circleguard-{env}"
     kinds = {}
     for d in docs:
@@ -91,7 +103,35 @@ for env in ("dev", "stage", "prod"):
         check(gw["metadata"]["annotations"].get("traefik.ingress.kubernetes.io/router.middlewares") == want,
               f"{env}: gateway Ingress middleware is not {want}")
     check("strip-gateway" in kinds.get("Middleware", {}), f"{env}: Middleware strip-gateway missing")
+    # HU-15: each environment sets its feature toggles in the ConfigMap and the service reads them from it.
+    config = kinds.get("ConfigMap", {}).get("circleguard-config", {}).get("data", {})
+    for toggle, app in FEATURE_TOGGLES.items():
+        check(config.get(toggle) in ("true", "false"), f"{env}: ConfigMap circleguard-config lacks {toggle}=true|false")
+        workload = kinds.get("Deployment", {}).get(app)
+        envs = workload["spec"]["template"]["spec"]["containers"][0].get("env", []) if workload else []
+        ref = next((e.get("valueFrom", {}).get("configMapKeyRef") for e in envs if e["name"] == toggle), None)
+        check(ref == {"name": "circleguard-config", "key": toggle}, f"{env}: {app} does not read {toggle} from the ConfigMap")
     print(f"{env}: {len(docs)} objects, namespace {ns}")
+
+# HU-15: flipping a toggle in the ConfigMap changes only the ConfigMap. Every Deployment (and so every
+# image) renders exactly the same, which is why the change needs a restart but no new image.
+with tempfile.TemporaryDirectory(dir=HERE) as tmp:
+    flipped = {t: "false" for t in FEATURE_TOGGLES}
+    literals = ", ".join(f"{k}={v}" for k, v in flipped.items())
+    (Path(tmp) / "kustomization.yaml").write_text(
+        "resources:\n  - ../overlays/dev\n"
+        "configMapGenerator:\n  - name: circleguard-config\n    behavior: merge\n"
+        f"    literals: [{literals}]\n"
+        "    options: {disableNameSuffixHash: true}\n")
+    base_code, _, base_docs = render(HERE / "overlays" / "dev")
+    flip_code, err, flip_docs = render(tmp)
+    check(not base_code and not flip_code, f"toggle flip: kustomize failed: {err}")
+    if not base_code and not flip_code:
+        before, after = by_kind(base_docs), by_kind(flip_docs)
+        check(before.get("Deployment") == after.get("Deployment"), "toggle flip: a Deployment changed with the ConfigMap")
+        cm_after = after["ConfigMap"]["circleguard-config"]["data"]
+        check(all(cm_after.get(k) == v for k, v in flipped.items()), "toggle flip: the ConfigMap did not change")
+        print("toggles: flipping the ConfigMap leaves every Deployment and image unchanged")
 
 # Scripts: lib.sh lists the workloads deploy.sh waits for, and the secrets never
 # travel as command-line arguments.

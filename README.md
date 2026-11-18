@@ -91,6 +91,7 @@ El equipo de Ingeniería de Software V añadió al producto base lo siguiente:
 - Orquestación con **Kubernetes** e infraestructura como código con **Terraform**.
 - Observabilidad: métricas, logs y trazas.
 - Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)).
+- Configuración externa y feature toggle: la regla de acceso del gateway para casos sospechosos se cambia desde el ConfigMap de cada ambiente, sin una imagen nueva (HU-15, [`docs/patrones/configuracion-externa-feature-toggle.md`](docs/patrones/configuracion-externa-feature-toggle.md)).
 
 ---
 

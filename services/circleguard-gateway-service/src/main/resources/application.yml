@@ -18,6 +18,12 @@ qr:
 server:
   port: 8087
 
+circleguard:
+  features:
+    # HU-15: feature toggle read from the environment. In Kubernetes FEATURE_DENY_SUSPECT_ENTRY comes from
+    # the ConfigMap circleguard-config. true = SUSPECT and PROBABLE users are denied entry (HU-07 policy).
+    deny-suspect-entry: ${FEATURE_DENY_SUSPECT_ENTRY:true}
+
 management:
   endpoints:
     web:
@@ -26,3 +32,11 @@ management:
   endpoint:
     health:
       show-details: never
+  info:
+    env:
+      enabled: true
+
+# HU-15: /actuator/info shows the active toggles, to check a ConfigMap change took effect.
+info:
+  features:
+    deny-suspect-entry: ${circleguard.features.deny-suspect-entry}

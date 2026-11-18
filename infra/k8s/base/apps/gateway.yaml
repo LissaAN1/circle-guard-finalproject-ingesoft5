@@ -29,6 +29,8 @@ spec:
             - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
             - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: JWT_SECRET}}}
             - {name: QR_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: QR_SECRET}}}
+            # HU-15: feature toggle from the ConfigMap of the environment.
+            - {name: FEATURE_DENY_SUSPECT_ENTRY, valueFrom: {configMapKeyRef: {name: circleguard-config, key: FEATURE_DENY_SUSPECT_ENTRY}}}
           startupProbe:
             httpGet: {path: /actuator/health, port: http}
             periodSeconds: 10

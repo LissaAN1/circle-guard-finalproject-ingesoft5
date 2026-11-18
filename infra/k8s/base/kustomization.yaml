@@ -39,6 +39,7 @@ configMapGenerator:
   - name: circleguard-config
     literals:
       - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
+      - FEATURE_DENY_SUSPECT_ENTRY=true
     options:
       disableNameSuffixHash: true
 

@@ -25,6 +25,9 @@ opcionalmente, nodos agentes. Pensado para usarse con la salida del módulo
 | `k3s_version` | string | `v1.31.4+k3s1` | Versión de k3s, con formato `vX.Y.Z+k3sN`. |
 | `ami_id` | string | `null` | AMI de los nodos; si es `null` se usa Ubuntu 24.04 LTS. |
 | `key_name` | string | `null` | Key pair existente para SSH; `null` desactiva el acceso por llave. |
+| `registry_endpoint` | string | `null` | Registro privado (Nexus) del que bajan imágenes los nodos, `host:puerto`. |
+| `registry_username` | string | `null` | Cuenta de solo lectura del registro (por ejemplo `cg-reader`). |
+| `registry_password_parameter` | string | `null` | Nombre (con `/` inicial) de un parámetro SSM SecureString con la contraseña del registro. |
 | `tags` | map(string) | `{}` | Etiquetas adicionales. |
 
 ## Requisitos
@@ -40,6 +43,19 @@ Terraform `>= 1.9.0`, providers `hashicorp/aws ~> 5.0` y `hashicorp/random ~> 3.
 | `server_public_ip` | IP pública del servidor (API de Kubernetes y entrada del Ingress). |
 | `agent_instance_ids` | IDs de las instancias agentes. |
 | `k3s_token_parameter_name` | Nombre del parámetro SSM con el token (el valor no se expone). |
+
+## Registro privado de imágenes (Nexus)
+
+Nexus sirve por HTTP, y containerd (k3s) solo habla HTTPS si no se le indica lo contrario. Con las tres variables `registry_*` definidas, el arranque de **cada nodo** (servidor y agentes) escribe `/etc/rancher/k3s/registries.yaml` con permisos `0600` **antes** de instalar k3s, de modo que el registro queda configurado sin pasos manuales y de forma reproducible.
+
+La contraseña no viaja por Terraform: el nodo la lee en el arranque del parámetro SSM cuyo **nombre** se pasa en `registry_password_parameter`, y la política IAM del nodo solo permite leer ese parámetro. El parámetro lo crea el operador una vez, fuera de Terraform (así la contraseña no está en el repositorio, ni en el estado, ni en el `user_data`):
+
+```bash
+read -rs -p 'Contraseña de cg-reader: ' P; echo
+aws ssm put-parameter --region us-east-1 --name /circleguard/nexus/cg-reader   --type SecureString --value "$P"; unset P
+```
+
+Las tres variables van juntas o ninguna. Como `user_data_replace_on_change = true`, **cambiar estas variables en un nodo ya creado lo reemplaza**: hay que definirlas antes del primer `apply`.
 
 ## Ejemplo
 
@@ -61,4 +77,4 @@ terraform validate
 terraform test   # usa providers simulados: no crea nada en AWS
 ```
 
-`tests/compute.tftest.hcl` comprueba los valores por defecto (un solo servidor, disco cifrado, IMDSv2) y que se rechacen un ambiente desconocido, subredes vacías, discos menores de 20 GB, `agent_count` fuera de rango y versiones de k3s mal formadas.
+`tests/compute.tftest.hcl` comprueba los valores por defecto (un solo servidor, disco cifrado, IMDSv2) que el registro privado se escriba en servidor y agentes solo cuando se configura (y que `user_data` nunca lleve la contraseña), y que se rechacen un registro incompleto o mal formado, un ambiente desconocido, subredes vacías, discos menores de 20 GB, `agent_count` fuera de rango y versiones de k3s mal formadas.

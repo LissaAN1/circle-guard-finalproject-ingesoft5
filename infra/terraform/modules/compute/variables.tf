@@ -84,3 +84,36 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "registry_endpoint" {
+  description = "Private image registry the nodes pull from, as host:port (for example the Nexus private address and port). Null leaves the nodes without a private registry."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.registry_endpoint == null || can(regex("^[A-Za-z0-9.-]+:[0-9]{2,5}$", var.registry_endpoint))
+    error_message = "registry_endpoint must look like host:port."
+  }
+}
+
+variable "registry_username" {
+  description = "Read-only account used to pull images from the private registry."
+  type        = string
+  default     = null
+}
+
+variable "registry_password_parameter" {
+  description = "Name of an existing SSM SecureString (starting with /) that holds the registry password. It is created by the operator outside Terraform, so the password is never in the repository, the state or the user data."
+  type        = string
+  default     = null
+
+  validation {
+    condition = (
+      var.registry_endpoint == null && var.registry_username == null && var.registry_password_parameter == null
+      ) || (
+      var.registry_endpoint != null && var.registry_username != null &&
+      var.registry_password_parameter != null && try(startswith(var.registry_password_parameter, "/"), false)
+    )
+    error_message = "Set registry_endpoint, registry_username and registry_password_parameter (starting with /) together, or none of them."
+  }
+}

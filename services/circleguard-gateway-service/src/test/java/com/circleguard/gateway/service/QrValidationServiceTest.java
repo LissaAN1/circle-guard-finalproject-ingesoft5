@@ -83,4 +83,52 @@ public class QrValidationServiceTest {
         assertEquals("RED", result.status());
         assertTrue(result.message().contains("Access Denied"));
     }
+
+    // HU-15: the suspect-entry policy follows the feature toggle; CONFIRMED is always denied.
+    @Test
+    void shouldDenySuspectUserWhenToggleIsOn() {
+        String anonymousId = UUID.randomUUID().toString();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn("POTENTIAL");
+
+        QrValidationService.ValidationResult result = service.validateToken(tokenFor(anonymousId));
+
+        assertFalse(result.valid());
+        assertEquals("RED", result.status());
+    }
+
+    @Test
+    void shouldAdmitSuspectUserWithWarningWhenToggleIsOff() {
+        QrValidationService relaxed = relaxedService();
+        String anonymousId = UUID.randomUUID().toString();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn("SUSPECT");
+
+        QrValidationService.ValidationResult result = relaxed.validateToken(tokenFor(anonymousId));
+
+        assertTrue(result.valid());
+        assertEquals("GREEN", result.status());
+        assertTrue(result.message().contains("Health Check Recommended"));
+    }
+
+    @Test
+    void shouldDenyLegacyConfirmedUserWhenToggleIsOff() {
+        QrValidationService relaxed = relaxedService();
+        String anonymousId = UUID.randomUUID().toString();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn("CONTAGIED");
+
+        QrValidationService.ValidationResult result = relaxed.validateToken(tokenFor(anonymousId));
+
+        assertFalse(result.valid());
+        assertEquals("RED", result.status());
+    }
+
+    private QrValidationService relaxedService() {
+        QrValidationService relaxed = new QrValidationService(redisTemplate, new FeatureToggles(false));
+        ReflectionTestUtils.setField(relaxed, "qrSecret", secret);
+        return relaxed;
+    }
+
+    private String tokenFor(String anonymousId) {
+        Key key = Keys.hmacShaKeyFor(secret.getBytes());
+        return Jwts.builder().setSubject(anonymousId).signWith(key, SignatureAlgorithm.HS256).compact();
+    }
 }

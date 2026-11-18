@@ -73,3 +73,20 @@ module "observability" {
   instances          = local.monitored_instances
   alarm_email        = var.alarm_email
 }
+
+# Optional for mock plans; mandatory in the Jenkins Kubernetes release tfvars.
+module "cicd_link" {
+  count  = var.cicd_vpc_id == null ? 0 : 1
+  source = "../../modules/cicd_link"
+
+  name                          = local.name
+  environment_vpc_id            = module.network.vpc_id
+  environment_vpc_cidr          = var.vpc_cidr
+  environment_route_table_id    = module.network.public_route_table_id
+  environment_security_group_id = module.network.cluster_security_group_id
+  cicd_vpc_id                   = var.cicd_vpc_id
+  cicd_vpc_cidr                 = var.cicd_vpc_cidr
+  cicd_route_table_ids          = var.cicd_route_table_ids
+  jenkins_private_ip            = var.jenkins_private_ip
+  nexus_security_group_id       = var.nexus_security_group_id
+}

@@ -12,3 +12,8 @@ output "cluster_security_group_id" {
   description = "ID of the security group to attach to the cluster nodes."
   value       = aws_security_group.cluster.id
 }
+
+output "public_route_table_id" {
+  description = "Route table shared by the public k3s node subnets."
+  value       = aws_route_table.public.id
+}

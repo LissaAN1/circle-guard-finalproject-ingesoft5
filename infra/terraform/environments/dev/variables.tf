@@ -84,3 +84,37 @@ variable "alarm_email" {
   type        = string
   default     = ""
 }
+
+variable "cicd_vpc_id" {
+  description = "Existing CI/CD VPC; null disables the private link for offline tests."
+  type        = string
+  default     = null
+  validation {
+    condition = (
+      var.cicd_vpc_id == null && var.cicd_vpc_cidr == null &&
+      length(var.cicd_route_table_ids) == 0 && var.jenkins_private_ip == null &&
+      var.nexus_security_group_id == null
+    ) || (
+      var.cicd_vpc_id != null && var.cicd_vpc_cidr != null &&
+      length(var.cicd_route_table_ids) > 0 && var.jenkins_private_ip != null &&
+      var.nexus_security_group_id != null
+    )
+    error_message = "Provide all CI/CD peering variables together, or none for mock tests."
+  }
+}
+variable "cicd_vpc_cidr" {
+  type = string
+  default = null
+}
+variable "cicd_route_table_ids" {
+  type = list(string)
+  default = []
+}
+variable "jenkins_private_ip" {
+  type = string
+  default = null
+}
+variable "nexus_security_group_id" {
+  type = string
+  default = null
+}

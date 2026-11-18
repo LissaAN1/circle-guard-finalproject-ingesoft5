@@ -19,6 +19,8 @@ jenkins:
           # Empty NEXUS_REGISTRY disables publishing (the pipeline reports it and moves on).
           - key: "NEXUS_REGISTRY"
             value: "${NEXUS_REGISTRY:-}"
+          - key: "CG_CD_PLATFORM"
+            value: "${CG_CD_PLATFORM:-compose}"
           # HU-05: empty SONAR_HOST_URL skips the Analysis stage; set, it runs the blocking quality gate.
           - key: "SONAR_HOST_URL"
             value: "${SONAR_HOST_URL:-}"

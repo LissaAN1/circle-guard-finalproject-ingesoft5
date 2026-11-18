@@ -58,6 +58,18 @@ infra/.env
 __pycache__/
 *.pyc
 
+# HU-13: generated security reports, caches and downloaded local tools
+ci/reports/trivy/
+ci/.trivy-cache/
+ci/.tools/
+
 # HU-02: private per-environment configuration
 infra/environments/.env.*
 !infra/environments/.env.example
+
+# Terraform private backend configuration
+**/backend.hcl
+
+# Terraform private variables and execution plans
+**/terraform.tfvars
+*.tfplan

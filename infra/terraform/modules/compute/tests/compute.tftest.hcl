@@ -101,3 +101,62 @@ run "rejects_unknown_environment" {
 
   expect_failures = [var.environment]
 }
+
+run "registry_is_off_by_default" {
+  command = plan
+
+  assert {
+    condition     = !strcontains(aws_instance.server.user_data, "registries.yaml")
+    error_message = "Without a registry the nodes must not write registries.yaml."
+  }
+}
+
+# apply against the mocked provider (nothing is created): the agent user data needs the
+# server private IP, which is unknown at plan time.
+run "registry_is_written_on_server_and_agents" {
+  command = apply
+
+  variables {
+    agent_count                 = 1
+    registry_endpoint           = "172.31.5.84:8082"
+    registry_username           = "cg-reader"
+    registry_password_parameter = "/circleguard/nexus/cg-reader"
+  }
+
+  assert {
+    condition = alltrue([
+      strcontains(aws_instance.server.user_data, "http://172.31.5.84:8082"),
+      strcontains(aws_instance.agent[0].user_data, "http://172.31.5.84:8082"),
+      strcontains(aws_instance.server.user_data, "/etc/rancher/k3s/registries.yaml"),
+      strcontains(aws_instance.agent[0].user_data, "umask 077"),
+    ])
+    error_message = "Server and agents must write registries.yaml for the private registry."
+  }
+
+  assert {
+    condition     = !strcontains(aws_instance.server.user_data, "VALOR") && strcontains(aws_instance.server.user_data, "/circleguard/nexus/cg-reader")
+    error_message = "The user data may only reference the SSM parameter name, never a password value."
+  }
+}
+
+run "rejects_a_partial_registry_configuration" {
+  command = plan
+
+  variables {
+    registry_endpoint = "172.31.5.84:8082"
+  }
+
+  expect_failures = [var.registry_password_parameter]
+}
+
+run "rejects_a_malformed_registry_endpoint" {
+  command = plan
+
+  variables {
+    registry_endpoint           = "http://nexus"
+    registry_username           = "cg-reader"
+    registry_password_parameter = "/circleguard/nexus/cg-reader"
+  }
+
+  expect_failures = [var.registry_endpoint]
+}

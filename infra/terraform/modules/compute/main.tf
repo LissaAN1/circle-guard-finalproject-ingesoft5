@@ -19,6 +19,14 @@ locals {
   )
 
   token_parameter = "/${var.name}/k3s/token"
+
+  # Private registry (Nexus over HTTP): rendered into /etc/rancher/k3s/registries.yaml
+  # at boot. Empty strings disable the block in the templates.
+  registry = {
+    endpoint           = var.registry_endpoint == null ? "" : var.registry_endpoint
+    username           = var.registry_username == null ? "" : var.registry_username
+    password_parameter = var.registry_password_parameter == null ? "" : var.registry_password_parameter
+  }
 }
 
 # The cluster join token is generated here and kept in SSM Parameter Store
@@ -58,23 +66,32 @@ resource "aws_iam_role_policy" "read_token" {
 
   policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = "ssm:GetParameter"
-        Resource = aws_ssm_parameter.k3s_token.arn
-      },
-      {
-        Effect   = "Allow"
-        Action   = "kms:Decrypt"
-        Resource = "*"
-        Condition = {
-          StringEquals = {
-            "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com"
+    Statement = concat(
+      [
+        {
+          Effect   = "Allow"
+          Action   = "ssm:GetParameter"
+          Resource = aws_ssm_parameter.k3s_token.arn
+        },
+        {
+          Effect   = "Allow"
+          Action   = "kms:Decrypt"
+          Resource = "*"
+          Condition = {
+            StringEquals = {
+              "kms:ViaService" = "ssm.${data.aws_region.current.name}.amazonaws.com"
+            }
           }
-        }
-      },
-    ]
+        },
+      ],
+      local.registry.endpoint == "" ? [] : [
+        {
+          Effect   = "Allow"
+          Action   = "ssm:GetParameter"
+          Resource = "arn:aws:ssm:${data.aws_region.current.name}:*:parameter${local.registry.password_parameter}"
+        },
+      ],
+    )
   })
 }
 
@@ -97,6 +114,7 @@ resource "aws_instance" "server" {
     region          = data.aws_region.current.name
     token_parameter = local.token_parameter
     k3s_version     = var.k3s_version
+    registry        = local.registry
   })
   user_data_replace_on_change = true
 
@@ -128,6 +146,7 @@ resource "aws_instance" "agent" {
     region          = data.aws_region.current.name
     token_parameter = local.token_parameter
     k3s_version     = var.k3s_version
+    registry        = local.registry
     server_ip       = aws_instance.server.private_ip
   })
   user_data_replace_on_change = true

@@ -94,7 +94,7 @@ variable "cicd_vpc_id" {
       var.cicd_vpc_id == null && var.cicd_vpc_cidr == null &&
       length(var.cicd_route_table_ids) == 0 && var.jenkins_private_ip == null &&
       var.nexus_security_group_id == null
-    ) || (
+      ) || (
       var.cicd_vpc_id != null && var.cicd_vpc_cidr != null &&
       length(var.cicd_route_table_ids) > 0 && var.jenkins_private_ip != null &&
       var.nexus_security_group_id != null
@@ -103,18 +103,36 @@ variable "cicd_vpc_id" {
   }
 }
 variable "cicd_vpc_cidr" {
-  type = string
+  type    = string
   default = null
 }
 variable "cicd_route_table_ids" {
-  type = list(string)
+  type    = list(string)
   default = []
 }
 variable "jenkins_private_ip" {
-  type = string
+  type    = string
   default = null
 }
 variable "nexus_security_group_id" {
-  type = string
+  type    = string
   default = null
+}
+
+variable "registry_endpoint" {
+  description = "Private image registry (Nexus) the k3s nodes pull from, host:port. Null: no private registry."
+  type        = string
+  default     = null
+}
+
+variable "registry_username" {
+  description = "Read-only account of the private registry."
+  type        = string
+  default     = null
+}
+
+variable "registry_password_parameter" {
+  description = "Name of the SSM SecureString (starting with /) that holds the registry password; created by the operator, never by Terraform."
+  type        = string
+  default     = null
 }

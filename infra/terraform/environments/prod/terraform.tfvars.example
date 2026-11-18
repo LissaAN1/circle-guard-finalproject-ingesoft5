@@ -7,3 +7,16 @@ admin_cidrs = ["203.0.113.10/32"]
 
 # Email for alarm notifications (optional; AWS sends a confirmation message).
 # alarm_email = "ops@example.com"
+
+# Private registry (Nexus) for the k3s nodes. The password is NOT here: create the SSM
+# SecureString once with `aws ssm put-parameter --type SecureString` and give its name.
+# registry_endpoint           = "10.0.0.10:8082"   # Nexus private IP and port
+# registry_username           = "cg-reader"
+# registry_password_parameter = "/circleguard/nexus/cg-reader"
+
+# Private link with the CI/CD VPC (all five together, or none for offline tests).
+# cicd_vpc_id             = "vpc-0123456789abcdef0"
+# cicd_vpc_cidr           = "172.31.0.0/16"
+# cicd_route_table_ids    = ["rtb-0123456789abcdef0"]
+# jenkins_private_ip      = "172.31.0.10"
+# nexus_security_group_id = "sg-0123456789abcdef0"

@@ -6,6 +6,31 @@ snap install aws-cli --classic
 
 TOKEN="$(aws ssm get-parameter --region ${region} --name ${token_parameter} \
   --with-decryption --query Parameter.Value --output text)"
+%{ if registry.endpoint != "" ~}
+
+# Private registry for containerd (k3s reads this file at start). The password is read
+# from SSM and written with mode 0600; it is never part of the user data.
+REG_PASSWORD="$(aws ssm get-parameter --region ${region} --name ${registry.password_parameter} \
+  --with-decryption --query Parameter.Value --output text)"
+# YAML single-quoted scalar: the only character to escape is the single quote (doubled).
+SQ="'"
+REG_PASSWORD_YAML="$${REG_PASSWORD//$SQ/$SQ$SQ}"
+mkdir -p /etc/rancher/k3s
+umask 077
+cat > /etc/rancher/k3s/registries.yaml <<EOF_REGISTRIES
+mirrors:
+  "${registry.endpoint}":
+    endpoint:
+      - "http://${registry.endpoint}"
+configs:
+  "${registry.endpoint}":
+    auth:
+      username: "${registry.username}"
+      password: '$REG_PASSWORD_YAML'
+EOF_REGISTRIES
+umask 022
+unset REG_PASSWORD REG_PASSWORD_YAML
+%{ endif ~}
 
 # Wait until the server API answers before joining.
 until curl -ks https://${server_ip}:6443/ping >/dev/null; do

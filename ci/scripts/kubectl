@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The Kubernetes manifests invoke kubectl through this verified agent-local CLI.
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec bash "$HERE/hu13-kubectl.sh" "$@"

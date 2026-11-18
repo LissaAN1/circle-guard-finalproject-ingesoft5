@@ -17,7 +17,7 @@ def call() {
 
     timeout(time: 30, unit: 'MINUTES') {
         input(
-            message: "Deploy ${env.CG_IMAGE_TAG} to prod?",
+            message: "Review the Terraform PROD plan in Console Output and approve release ${env.CG_IMAGE_TAG} to Kubernetes/production?",
             ok: 'Approve',
             submitter: approvers,
             submitterParameter: 'CG_PROD_APPROVED_BY'

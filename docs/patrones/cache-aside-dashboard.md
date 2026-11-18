@@ -57,6 +57,7 @@ a un valor `stale`.
 | Frescura | Se calcula con `cachedAt` y el reloj del servicio, no con el TTL de Redis. Así una sola entrada sirve para responder rápido (fresca) y para el respaldo (vieja). |
 | Expiración en Redis | `stale-ttl`. Pasado ese tiempo la entrada desaparece y no se sirven datos de más de un día. |
 | Qué no se guarda | La respuesta degradada de promotion. Si se guardara, ocultaría el último valor bueno. |
+| Health check | `management.health.redis.enabled: false`: si se agrega Actuator, Redis caído no debe marcar el dashboard como `DOWN` ni hacer que las sondas de Kubernetes lo reinicien. |
 | Redis caído | La caché es una optimización, no una dependencia. Un error de Redis (`DataAccessException`) se registra y la consulta va a promotion como antes de esta historia. Los timeouts de Redis son de 500 ms para no retrasar el dashboard. Una entrada ilegible se ignora. |
 
 ### 2.2 Configuración
@@ -69,7 +70,7 @@ reconstruir la imagen:
 | `DASHBOARD_CACHE_FRESH_TTL` | `60s` | Tiempo en que una entrada se responde sin llamar a promotion. |
 | `DASHBOARD_CACHE_STALE_TTL` | `24h` | Tiempo que se conserva el último valor para el respaldo. Debe ser mayor o igual que el anterior. |
 | `SPRING_DATA_REDIS_HOST` / `SPRING_DATA_REDIS_PORT` | `localhost` / `6379` | Redis, el mismo que usan gateway y promotion. |
-| `REDIS_PASSWORD` | vacío | Contraseña de Redis; en los ambientes llega desde el `.env` del ambiente. |
+| `REDIS_PASSWORD` | vacío | Contraseña de Redis; en Kubernetes llega del Secret `circleguard-secrets` (`infra/k8s/base/apps/dashboard.yaml`). |
 
 ## 3. Trade-offs
 
@@ -100,8 +101,8 @@ en la etapa **Test** del pipeline.
 
 ### 4.1 Demostración manual
 
-El dashboard todavía no está en el Docker Compose de los ambientes; se desplegará con Kubernetes en la
-Parte 2 (HU-11). Para verlo funcionar en local con Redis y promotion levantados:
+El dashboard no está en el Docker Compose de los ambientes; en Kubernetes (HU-11) su Deployment recibe la
+conexión a Redis por variables de entorno. Para verlo funcionar en local con Redis y promotion levantados:
 
 ```bash
 # 1. Primera consulta: llega a promotion y se guarda en Redis.
@@ -124,3 +125,4 @@ curl -s http://localhost:8084/api/v1/analytics/summary
 | `.../dashboard/service/AnalyticsService.java` | Usa la caché en lugar de llamar a `PromotionClient` directamente. |
 | `services/circleguard-dashboard-service/src/main/resources/application.yml` | Conexión a Redis y TTL de la caché. |
 | `services/circleguard-dashboard-service/build.gradle.kts` | Dependencia `spring-boot-starter-data-redis`. |
+| `infra/k8s/base/apps/dashboard.yaml` | Variables de conexión a Redis en el Deployment. |

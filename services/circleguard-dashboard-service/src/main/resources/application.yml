@@ -28,6 +28,13 @@ spring:
 server:
   port: 8084
 
+management:
+  health:
+    redis:
+      # HU-16: Redis is an optional cache. If Actuator is added, a Redis outage must not mark the
+      # dashboard DOWN (and get it restarted by its probes); the cache is skipped instead.
+      enabled: false
+
 circleguard:
   dashboard:
     cache:

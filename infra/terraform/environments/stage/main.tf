@@ -43,6 +43,10 @@ module "compute" {
   root_volume_gb    = var.root_volume_gb
   agent_count       = var.agent_count
   key_name          = var.key_name
+
+  registry_endpoint           = var.registry_endpoint
+  registry_username           = var.registry_username
+  registry_password_parameter = var.registry_password_parameter
 }
 
 module "registry" {

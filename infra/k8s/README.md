@@ -23,7 +23,7 @@ infra/k8s/
 | Recurso | Contenido |
 |:---|:---|
 | Namespace `circleguard-dev`, `-stage`, `-prod` | Aísla cada ambiente (uno por clúster k3s). |
-| ConfigMap `circleguard-config` | Configuración no sensible (orígenes CORS). Cambia por ambiente en el overlay. |
+| ConfigMap `circleguard-config` | Configuración no sensible (orígenes CORS) y feature toggles (`FEATURE_DENY_SUSPECT_ENTRY`, HU-15). Cambia por ambiente en el overlay. |
 | ConfigMap `postgres-init` | `init-db.sql`: crea `circleguard_auth`, `identity`, `promotion`, `dashboard` y `form`. |
 | Secret `circleguard-secrets` | `DB_USER`, `DB_PASSWORD`, `NEO4J_PASSWORD`, `LDAP_ADMIN_PASSWORD`, `REDIS_PASSWORD`, `JWT_SECRET`, `QR_SECRET`, `VAULT_SECRET`, `VAULT_SALT`, `VAULT_HASH_SALT`. **No está en el repositorio**: lo crea `secrets.sh` a partir de `infra/environments/.env.<ambiente>` (que genera `create-env.sh` y git ignora). |
 

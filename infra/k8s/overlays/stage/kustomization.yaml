@@ -13,6 +13,9 @@ configMapGenerator:
     behavior: merge
     literals:
       - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
+      # HU-15: feature toggle of the gateway. true = SUSPECT/PROBABLE users are denied entry.
+      # Change it here (or with kubectl edit) and restart the gateway: no new image is needed.
+      - FEATURE_DENY_SUSPECT_ENTRY=true
     options:
       disableNameSuffixHash: true
 

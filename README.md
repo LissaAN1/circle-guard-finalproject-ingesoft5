@@ -90,7 +90,8 @@ El equipo de Ingeniería de Software V añadió al producto base lo siguiente:
 - Despliegue de `notification`, `file` y `dashboard`. En la Parte 1 estos servicios se compilan, se prueban y se empaquetan, pero no se despliegan.
 - Orquestación con **Kubernetes** e infraestructura como código con **Terraform**.
 - Observabilidad: métricas, logs y trazas.
-- Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)) y cache-aside con Redis en dashboard → promotion (HU-16, [`docs/patrones/cache-aside-dashboard.md`](docs/patrones/cache-aside-dashboard.md)).
+- Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)).
+- Configuración externa y feature toggle: la regla de acceso del gateway para casos sospechosos se cambia desde el ConfigMap de cada ambiente, sin una imagen nueva (HU-15, [`docs/patrones/configuracion-externa-feature-toggle.md`](docs/patrones/configuracion-externa-feature-toggle.md)).
 
 ---
 

@@ -175,7 +175,7 @@ CircleGuard follows a **Microservice Architecture** built on a **Hybrid Data Mod
 ├── docs/
 │   ├── agil/                    # [DevOps] Documentos ágiles 00–08
 │   ├── operaciones/             # [DevOps] Runbooks de pipeline, quality gate, entrega continua y hallazgos
-│   └── patrones/                # [DevOps] Patrones de diseño implementados (HU-14 resiliencia, ...)
+│   └── patrones/                # [DevOps] Patrones de diseño implementados (HU-14 resiliencia, HU-16 cache-aside, ...)
 ├── .github/                     # [DevOps] Plantilla de PR y workflow de validación de commits
 ├── .githooks/                   # [DevOps] Validación del asunto de los commits
 ├── CHANGELOG.md                 # [DevOps] Release notes (generadas con infra/release/release.sh)

@@ -1,6 +1,6 @@
 package com.circleguard.dashboard.service;
 
-import com.circleguard.dashboard.client.PromotionClient;
+import com.circleguard.dashboard.cache.PromotionStatsCache;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -10,21 +10,23 @@ import java.util.*;
 @RequiredArgsConstructor
 public class AnalyticsService {
     private final JdbcTemplate jdbc;
-    private final PromotionClient promotionClient;
+    // HU-16: promotion-service statistics are read through the Redis cache-aside.
+    private final PromotionStatsCache promotionStats;
     private final KAnonymityFilter kAnonymityFilter;
 
     /**
-     * Gets campus-wide health summary from promotion-service.
+     * Gets campus-wide health summary from promotion-service (cached in Redis).
      */
     public Map<String, Object> getCampusSummary() {
-        return promotionClient.getHealthStats();
+        return promotionStats.getHealthStats();
     }
 
     /**
-     * Gets department-filtered health stats with K-Anonymity applied.
+     * Gets department-filtered health stats with K-Anonymity applied. The raw statistics are cached and
+     * the filter runs on every response, including a stale one.
      */
     public Map<String, Object> getDepartmentStats(String department) {
-        Map<String, Object> raw = promotionClient.getHealthStatsByDepartment(department);
+        Map<String, Object> raw = promotionStats.getHealthStatsByDepartment(department);
         return kAnonymityFilter.apply(raw);
     }
 

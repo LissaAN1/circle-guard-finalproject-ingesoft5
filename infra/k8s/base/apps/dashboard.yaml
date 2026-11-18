@@ -27,6 +27,10 @@ spec:
             - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_USER}}}
             - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_PASSWORD}}}
             - {name: CIRCLEGUARD_PROMOTIONSERVICE_URL, value: "http://promotion:8088"}
+            # HU-16: Redis holds the cache-aside copy of the promotion statistics.
+            - {name: SPRING_DATA_REDIS_HOST, value: "redis"}
+            - {name: SPRING_DATA_REDIS_PORT, value: "6379"}
+            - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
           startupProbe:
             httpGet: {path: /actuator/health, port: http}
             periodSeconds: 10

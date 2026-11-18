@@ -90,7 +90,7 @@ El equipo de Ingeniería de Software V añadió al producto base lo siguiente:
 - Despliegue de `notification`, `file` y `dashboard`. En la Parte 1 estos servicios se compilan, se prueban y se empaquetan, pero no se despliegan.
 - Orquestación con **Kubernetes** e infraestructura como código con **Terraform**.
 - Observabilidad: métricas, logs y trazas.
-- Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)).
+- Patrones de diseño. Implementado: Circuit Breaker y Retry con Resilience4j en auth → identity y dashboard → promotion (HU-14, [`docs/patrones/resiliencia-circuit-breaker.md`](docs/patrones/resiliencia-circuit-breaker.md)) y cache-aside con Redis en dashboard → promotion (HU-16, [`docs/patrones/cache-aside-dashboard.md`](docs/patrones/cache-aside-dashboard.md)).
 - Configuración externa y feature toggle: la regla de acceso del gateway para casos sospechosos se cambia desde el ConfigMap de cada ambiente, sin una imagen nueva (HU-15, [`docs/patrones/configuracion-externa-feature-toggle.md`](docs/patrones/configuracion-externa-feature-toggle.md)).
 
 ---
@@ -175,7 +175,7 @@ CircleGuard follows a **Microservice Architecture** built on a **Hybrid Data Mod
 ├── docs/
 │   ├── agil/                    # [DevOps] Documentos ágiles 00–08
 │   ├── operaciones/             # [DevOps] Runbooks de pipeline, quality gate, entrega continua y hallazgos
-│   └── patrones/                # [DevOps] Patrones de diseño implementados (HU-14 resiliencia, HU-16 cache-aside, ...)
+│   └── patrones/                # [DevOps] Patrones de diseño implementados (HU-14 resiliencia, HU-15 configuración externa, HU-16 cache-aside, ...)
 ├── .github/                     # [DevOps] Plantilla de PR y workflow de validación de commits
 ├── .githooks/                   # [DevOps] Validación del asunto de los commits
 ├── CHANGELOG.md                 # [DevOps] Release notes (generadas con infra/release/release.sh)

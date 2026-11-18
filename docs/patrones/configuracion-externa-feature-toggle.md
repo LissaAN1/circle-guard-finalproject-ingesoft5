@@ -43,7 +43,7 @@ overlays/<ambiente>/kustomization.yaml
 |---|---|---|
 | `CONFIRMED` (o el valor heredado `CONTAGIED`) | Rechazado (`RED`) | Rechazado (`RED`): no depende del toggle |
 | `SUSPECT`, `PROBABLE` (o el heredado `POTENTIAL`) | Rechazado (`RED`), como en la HU-07 | Admitido (`GREEN`) con el mensaje `Welcome to Campus: Health Check Recommended` |
-| Sin riesgo | Admitido (`GREEN`) | Admitido (`GREEN`) |
+| Sin riesgo, o sin clave en Redis (nunca tuvo un evento de salud) | Admitido (`GREEN`) | Admitido (`GREEN`) |
 
 - El valor por defecto es `true`: si falta la variable, se mantiene la política estricta. Un error de
   configuración nunca deja entrar a nadie que antes se rechazaba.

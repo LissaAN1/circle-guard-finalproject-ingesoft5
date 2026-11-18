@@ -97,6 +97,14 @@ class SuspectEntryToggleTest {
         }
 
         @Test
+        void usersWithoutAStatusKeyEnter() throws Exception {
+            validateUserWithStatus(null)
+                    .andExpect(jsonPath("$.valid").value(true))
+                    .andExpect(jsonPath("$.status").value("GREEN"))
+                    .andExpect(jsonPath("$.message").value("Welcome to Campus"));
+        }
+
+        @Test
         void infoShowsTheActiveToggle() throws Exception {
             info().andExpect(status().isOk())
                     .andExpect(jsonPath("$.features.deny-suspect-entry").value("true"));
@@ -127,6 +135,10 @@ class SuspectEntryToggleTest {
         @Test
         void healthyUsersAreUnaffected() throws Exception {
             validateUserWithStatus("ACTIVE").andExpect(jsonPath("$.valid").value(true));
+            // No key in Redis: the user never had a health event.
+            validateUserWithStatus(null)
+                    .andExpect(jsonPath("$.valid").value(true))
+                    .andExpect(jsonPath("$.message").value("Welcome to Campus"));
         }
 
         @Test

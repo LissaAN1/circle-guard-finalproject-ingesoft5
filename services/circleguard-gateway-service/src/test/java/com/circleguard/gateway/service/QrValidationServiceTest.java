@@ -121,6 +121,31 @@ public class QrValidationServiceTest {
         assertEquals("RED", result.status());
     }
 
+    // A user without any health event has no key in Redis (null): admitted with either toggle value.
+    @Test
+    void shouldAdmitUserWithoutStatusKeyWhenToggleIsOn() {
+        String anonymousId = UUID.randomUUID().toString();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn(null);
+
+        QrValidationService.ValidationResult result = service.validateToken(tokenFor(anonymousId));
+
+        assertTrue(result.valid());
+        assertEquals("GREEN", result.status());
+        assertEquals("Welcome to Campus", result.message());
+    }
+
+    @Test
+    void shouldAdmitUserWithoutStatusKeyWhenToggleIsOff() {
+        String anonymousId = UUID.randomUUID().toString();
+        Mockito.when(valueOps.get("user:status:" + anonymousId)).thenReturn(null);
+
+        QrValidationService.ValidationResult result = relaxedService().validateToken(tokenFor(anonymousId));
+
+        assertTrue(result.valid());
+        assertEquals("GREEN", result.status());
+        assertEquals("Welcome to Campus", result.message());
+    }
+
     private QrValidationService relaxedService() {
         QrValidationService relaxed = new QrValidationService(redisTemplate, new FeatureToggles(false));
         ReflectionTestUtils.setField(relaxed, "qrSecret", secret);

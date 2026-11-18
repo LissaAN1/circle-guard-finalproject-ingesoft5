@@ -41,6 +41,11 @@ public class QrValidationService {
             // Check Redis for current Health Status
             String status = redisTemplate.opsForValue().get(STATUS_KEY_PREFIX + anonymousId);
 
+            // No key means no health event for this user (promotion only writes one on a status change):
+            // the user is healthy. Set.of(...).contains(null) would throw, so it is handled first.
+            if (status == null) {
+                return new ValidationResult(true, "GREEN", "Welcome to Campus");
+            }
             if (CONFIRMED_STATUSES.contains(status)) {
                 return new ValidationResult(false, "RED", "Access Denied: Health Risk Detected");
             }

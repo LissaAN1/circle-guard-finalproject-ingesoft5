@@ -20,6 +20,9 @@ spec:
       containers:
         - name: postgres
           image: postgres:16
+          # Each service replica keeps its own connection pool; with 2 or more
+          # replicas per service (prod and HPA scale-out) the default of 100 runs out.
+          args: ["-c", "max_connections=300"]
           ports:
             - name: main
               containerPort: 5432
@@ -43,7 +46,7 @@ spec:
             failureThreshold: 12
           resources:
             requests: {cpu: 100m, memory: 256Mi}
-            limits: {memory: 1Gi}
+            limits: {memory: 1536Mi}
       volumes:
         - name: init
           configMap:

@@ -26,18 +26,20 @@ spec:
             - {name: SPRING_KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092"}
             - {name: SPRING_MAIL_HOST, value: "localhost"}
             - {name: AUTH_API_URL, value: "http://auth:8180"}
+          # This service does not include Spring Boot Actuator yet, so /actuator/health
+          # does not exist; the probes check that the port accepts connections.
           startupProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

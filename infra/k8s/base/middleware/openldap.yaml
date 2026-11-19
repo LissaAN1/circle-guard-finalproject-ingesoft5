@@ -30,6 +30,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/ldap
+            # The image refuses to start when the database persists but its
+            # configuration directory does not, so both are kept.
+            - name: config
+              mountPath: /etc/ldap/slapd.d
           readinessProbe:
             tcpSocket: {port: main}
             initialDelaySeconds: 20
@@ -47,6 +51,13 @@ spec:
         resources:
           requests:
             storage: 1Gi
+    - metadata:
+        name: config
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 100Mi
 ---
 apiVersion: v1
 kind: Service

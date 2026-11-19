@@ -17,6 +17,9 @@ spec:
         app.kubernetes.io/name: kafka
         app.kubernetes.io/part-of: circleguard
     spec:
+      # A Service named like this app makes Kubernetes inject <NAME>_PORT=tcp://...
+      # variables, which the image reads as its own settings and refuses to start.
+      enableServiceLinks: false
       containers:
         - name: kafka
           image: confluentinc/cp-kafka:7.6.0

@@ -19,27 +19,38 @@ spec:
       containers:
         - name: file
           image: circleguard-file-service
+          # The service writes to a relative "uploads" folder, which the image
+          # working directory does not allow. Run it from a writable volume.
+          workingDir: /data
+          volumeMounts:
+            - name: data
+              mountPath: /data
           ports:
             - name: http
               containerPort: 8085
+          # This service does not include Spring Boot Actuator yet, so /actuator/health
+          # does not exist; the probes check that the port accepts connections.
           startupProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5
           resources:
             requests: {cpu: 100m, memory: 256Mi}
             limits: {cpu: "1", memory: 768Mi}
+      volumes:
+        - name: data
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service

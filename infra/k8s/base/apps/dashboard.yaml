@@ -31,18 +31,20 @@ spec:
             - {name: SPRING_DATA_REDIS_HOST, value: "redis"}
             - {name: SPRING_DATA_REDIS_PORT, value: "6379"}
             - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
+          # This service does not include Spring Boot Actuator yet, so /actuator/health
+          # does not exist; the probes check that the port accepts connections.
           startupProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            tcpSocket: {port: http}
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5

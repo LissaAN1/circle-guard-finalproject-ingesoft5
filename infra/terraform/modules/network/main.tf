@@ -43,6 +43,13 @@ resource "aws_route_table" "public" {
   }
 
   tags = merge(local.tags, { Name = "${var.name}-public-rt" })
+
+  # Other modules (cicd_link) add their own aws_route entries to this table,
+  # such as the VPC peering route to Jenkins and Nexus. Without this, every
+  # plan would try to delete those routes to match the inline block above.
+  lifecycle {
+    ignore_changes = [route]
+  }
 }
 
 resource "aws_route_table_association" "public" {

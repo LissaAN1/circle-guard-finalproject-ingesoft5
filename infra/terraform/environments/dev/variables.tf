@@ -144,9 +144,9 @@ variable "monthly_limit_usd" {
 }
 
 variable "scale_to_zero_enabled" {
-  description = "Stop the nodes outside working hours (FinOps). Set false while the environment is in use at night."
+  description = "Stop the nodes outside working hours (FinOps). Off by default in dev: the pipeline deploys and tests dev at any hour. Turn it on after the delivery."
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "stop_schedule" {

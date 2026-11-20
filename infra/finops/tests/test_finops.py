@@ -48,6 +48,11 @@ class CostReportTest(unittest.TestCase):
         ]
         self.assertEqual(cost_report.grouped(periods), {"A": 2.0})
 
+    def test_net_zero_is_not_printed_as_negative(self):
+        text = cost_report.build("2026-11-01", "2026-11-21", {"Environment$": 27.45}, {"EC2": 27.45}, -27.45)
+        self.assertIn("Neto cobrado: **0.00 USD**", text)
+        self.assertNotIn("-0.00", text)
+
     def test_report_states_gross_credits_and_net(self):
         text = cost_report.build(
             "2026-11-01", "2026-11-21",

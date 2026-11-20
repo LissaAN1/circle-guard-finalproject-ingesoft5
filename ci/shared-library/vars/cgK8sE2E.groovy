@@ -8,7 +8,7 @@ def call(Map cfg = [:]) {
     String survey = target == 'dev' ? 'circleguard-e2e-survey' : 'circleguard-stage-e2e-survey'
     String gate = target == 'dev' ? 'circleguard-e2e-gate' : 'circleguard-stage-e2e-gate'
     withCredentials([
-        file(credentialsId: "kubeconfig-${target}", variable: 'KUBECONFIG'),
+        file(credentialsId: "kubeconfig-e2e-${target}", variable: 'KUBECONFIG'),
         usernamePassword(credentialsId: survey,
             usernameVariable: 'E2E_USERNAME', passwordVariable: 'E2E_PASSWORD'),
         usernamePassword(credentialsId: gate,

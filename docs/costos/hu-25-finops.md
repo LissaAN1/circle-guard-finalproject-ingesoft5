@@ -62,9 +62,10 @@ el módulo rechaza `scale_to_zero_enabled = true` en ese ambiente.
 
 - Un rol de IAM dedicado solo puede detener e iniciar los nodos de su ambiente.
 - `scale_to_zero_enabled = false` en el `tfvars` desactiva el horario, por ejemplo cuando alguien prueba de noche.
-- Dev lo trae activo por defecto. **Stage lo trae apagado hasta después de la entrega del 22 de noviembre**: el
-  pipeline de `main` despliega y prueba stage (Deploy Stage, E2E, Performance y ZAP) a cualquier hora, y con los nodos
-  detenidos esas etapas fallarían. Pasada la entrega se activa con `scale_to_zero_enabled = true`.
+- **Dev y stage lo traen apagado hasta después de la entrega del 22 de noviembre.** El pipeline de `main` pasa primero
+  por dev (Terraform, Deploy Dev, E2E) y luego por stage (Deploy Stage, E2E, Performance y ZAP), y un push a `dev`
+  también despliega en dev. Terraform no enciende instancias detenidas, así que con el horario activo esas etapas
+  fallarían de noche. Pasada la entrega se activa en los dos con `scale_to_zero_enabled = true`.
 - El horario se cambia con `stop_schedule` y `start_schedule`.
 
 Al encender un nodo cambia su IP pública. Jenkins debe usar las IP privadas por el peering, y los kubeconfig locales

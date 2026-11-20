@@ -8,6 +8,7 @@ it answering NO to every question, so the load never changes anyone's health sta
 Both flows use the dedicated E2E survey account (E2E_USERNAME / E2E_PASSWORD). Tokens,
 passwords and response bodies are never logged.
 """
+import json
 import os
 import random
 
@@ -34,7 +35,14 @@ def negative_answers(questionnaire):
         if q.get("type") == "YES_NO":
             answers[q["id"]] = "NO"
         elif q.get("options"):
-            options = [o.strip() for o in str(q["options"]).split(",") if o.strip()]
+            # options is JSONB: a list, a JSON-encoded list or a comma-separated string.
+            raw = q["options"]
+            if isinstance(raw, str):
+                try:
+                    raw = json.loads(raw)
+                except ValueError:
+                    raw = raw.split(",")
+            options = [str(o).strip() for o in (raw if isinstance(raw, list) else [raw]) if str(o).strip()]
             answers[q["id"]] = options[0] if options else "NONE"
         else:
             answers[q["id"]] = "NONE"

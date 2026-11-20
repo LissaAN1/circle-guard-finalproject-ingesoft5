@@ -153,6 +153,13 @@ class LocustScenario(unittest.TestCase):
         ]})
         self.assertEqual(answers, {"a": "NO", "b": "None", "c": "NONE"})
 
+    def test_jsonb_options_as_list_or_json_text(self):
+        answers = self.module.negative_answers({"questions": [
+            {"id": "a", "type": "SINGLE_CHOICE", "options": ["None", "Mild"]},
+            {"id": "b", "type": "SINGLE_CHOICE", "options": '["None", "Severe"]'},
+        ]})
+        self.assertEqual(answers, {"a": "None", "b": "None"})
+
     def test_credentials_are_required(self):
         with unittest.mock.patch.dict(os.environ, {"E2E_USERNAME": "", "E2E_PASSWORD": ""}):
             with self.assertRaises(RuntimeError):

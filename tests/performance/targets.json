@@ -1,0 +1,11 @@
+{
+  "_comment": "HU-21: objetivos declarados antes de la prueba. Se comparan con el CSV de Locust en evaluate.py.",
+  "load": {"users": 20, "spawn_rate": 2, "duration": "5m"},
+  "requests": {
+    "gate: qr generate": {"p95_ms": 500},
+    "gate: validate": {"p95_ms": 300},
+    "survey: active questionnaire": {"p95_ms": 500},
+    "survey: submit": {"p95_ms": 800}
+  },
+  "aggregate": {"p95_ms": 800, "min_rps": 8.0, "max_error_rate": 0.01}
+}

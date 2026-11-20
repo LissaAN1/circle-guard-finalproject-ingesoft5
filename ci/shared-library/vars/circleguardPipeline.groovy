@@ -192,6 +192,30 @@ def call() {
                 }
                 steps { cgE2E(environment: 'stage') }
             }
+            // HU-21: performance (Locust) and security (ZAP baseline) on the same stage release.
+            // Both need the K3s cluster, so they run only on the Kubernetes release path.
+            stage('Performance STAGE') {
+                when {
+                    allOf {
+                        expression { env.CG_CD_PLATFORM == 'k8s' }
+                        expression { env.BRANCH_NAME == 'main' }
+                        expression { !env.CHANGE_ID }
+                        expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                    }
+                }
+                steps { cgPerformance(environment: 'stage') }
+            }
+            stage('ZAP Baseline STAGE') {
+                when {
+                    allOf {
+                        expression { env.CG_CD_PLATFORM == 'k8s' }
+                        expression { env.BRANCH_NAME == 'main' }
+                        expression { !env.CHANGE_ID }
+                        expression { env.NEXUS_REGISTRY?.trim() as Boolean }
+                    }
+                }
+                steps { cgZap(environment: 'stage') }
+            }
             // HU-13: plan PROD before the approval gate; apply that same plan afterward.
             stage('Terraform Plan PROD') {
                 when {

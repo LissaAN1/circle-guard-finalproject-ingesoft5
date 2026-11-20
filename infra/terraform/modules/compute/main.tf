@@ -129,6 +129,13 @@ resource "aws_instance" "server" {
     http_tokens   = "required"
   }
 
+  # Canonical moves the "current" image parameter on every release. A new image must
+  # not replace a node that already runs the cluster: new nodes take the current image
+  # and ami_id pins one when a fixed image is needed.
+  lifecycle {
+    ignore_changes = [ami]
+  }
+
   tags = merge(local.tags, { Name = "${var.name}-server", Role = "k3s-server" })
 }
 
@@ -160,6 +167,13 @@ resource "aws_instance" "agent" {
   metadata_options {
     http_endpoint = "enabled"
     http_tokens   = "required"
+  }
+
+  # Canonical moves the "current" image parameter on every release. A new image must
+  # not replace a node that already runs the cluster: new nodes take the current image
+  # and ami_id pins one when a fixed image is needed.
+  lifecycle {
+    ignore_changes = [ami]
   }
 
   tags = merge(local.tags, { Name = "${var.name}-agent-${count.index + 1}", Role = "k3s-agent" })

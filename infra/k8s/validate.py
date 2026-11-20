@@ -96,7 +96,14 @@ for env in ("dev", "stage", "prod"):
     routes = {}
     for ing in ingresses.values():
         check(ing["spec"].get("ingressClassName") == "traefik", f"{env}: Ingress {ing['metadata']['name']} is not for traefik")
+        host = f"{env}.circleguard.test"
+        check(ing["metadata"].get("annotations", {}).get("traefik.ingress.kubernetes.io/router.entrypoints") == "websecure",
+              f"{env}: Ingress {ing['metadata']['name']} does not require the HTTPS entrypoint")
+        tls = ing["spec"].get("tls", [])
+        check(any(t.get("secretName") == "circleguard-ingress-tls" and host in t.get("hosts", []) for t in tls),
+              f"{env}: Ingress {ing['metadata']['name']} lacks a TLS Secret for {host}")
         for rule in ing["spec"]["rules"]:
+            check(rule.get("host") == host, f"{env}: Ingress {ing['metadata']['name']} host differs from {host}")
             for p in rule["http"]["paths"]:
                 routes[p["path"]] = p["backend"]["service"]["name"]
     check(routes.get("/") == "web", f"{env}: Ingress does not expose the web client on /")

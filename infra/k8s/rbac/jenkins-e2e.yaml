@@ -1,0 +1,43 @@
+# This ServiceAccount can prepare test fixtures but cannot deploy or read Secrets.
+# NAMESPACE is substituted when a trusted operator provisions the credential.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-e2e
+  namespace: NAMESPACE
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-e2e
+  namespace: NAMESPACE
+rules:
+  # kubectl port-forward service/web resolves a Service and a matching Pod.
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list"]
+  # kubectl exec statefulset/redis first resolves the StatefulSet to its Pod.
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get"]
+  # Tests interact only with the Redis fixture and the local web tunnel.
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/portforward"]
+    verbs: ["create"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-e2e
+  namespace: NAMESPACE
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-e2e
+    namespace: NAMESPACE
+roleRef:
+  kind: Role
+  name: jenkins-e2e
+  apiGroup: rbac.authorization.k8s.io

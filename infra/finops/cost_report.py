@@ -18,7 +18,7 @@ NO_CREDITS = {"Not": {"Dimensions": {"Key": "RECORD_TYPE", "Values": ["Credit", 
 CREDITS = {"Dimensions": {"Key": "RECORD_TYPE", "Values": ["Credit"]}}
 
 
-def ce(args, start, end, profile, flt, group=None):
+def ce(start, end, profile, flt, group=None):
     cmd = [
         "aws", "ce", "get-cost-and-usage", "--time-period", f"Start={start},End={end}",
         "--granularity", "MONTHLY", "--metrics", "UnblendedCost", "--filter", json.dumps(flt),
@@ -62,11 +62,12 @@ def table(title, rows):
 
 def build(start, end, by_env, by_service, credits):
     gross = sum(by_service.values())
+    net = round(gross + credits, 2) + 0.0  # avoids printing -0.00
     parts = [
         f"# Reporte de costos del {start} al {end}",
         "",
         f"Gasto bruto: **{gross:.2f} USD**. Créditos aplicados: **{credits:.2f} USD**. "
-        f"Neto cobrado: **{gross + credits:.2f} USD**.",
+        f"Neto cobrado: **{net:.2f} USD**.",
         "",
         table("Por ambiente (etiqueta Environment)", {clean_tag(k): v for k, v in by_env.items()}),
         table("Por servicio", by_service),
@@ -81,9 +82,9 @@ def main():
     p.add_argument("--profile")
     sys.stdout.reconfigure(encoding="utf-8")
     a = p.parse_args()
-    by_env = grouped(ce(None, a.start, a.end, a.profile, NO_CREDITS, "Type=TAG,Key=Environment"))
-    by_service = grouped(ce(None, a.start, a.end, a.profile, NO_CREDITS, "Type=DIMENSION,Key=SERVICE"))
-    credits = total(ce(None, a.start, a.end, a.profile, CREDITS))
+    by_env = grouped(ce(a.start, a.end, a.profile, NO_CREDITS, "Type=TAG,Key=Environment"))
+    by_service = grouped(ce(a.start, a.end, a.profile, NO_CREDITS, "Type=DIMENSION,Key=SERVICE"))
+    credits = total(ce(a.start, a.end, a.profile, CREDITS))
     print(build(a.start, a.end, by_env, by_service, credits), end="")
 
 

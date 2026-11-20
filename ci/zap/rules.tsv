@@ -1,5 +1,5 @@
 10010	FAIL	(Cookie No HttpOnly Flag)
-10011	FAIL	(Cookie Without Secure Flag)
+10011	WARN	(Cookie Without Secure Flag - stage is served over plain HTTP; FAIL once TLS is enabled)
 10024	FAIL	(Information Disclosure - Sensitive Information in URL)
 10062	FAIL	(PII Disclosure)
 10096	IGNORE	(Timestamp Disclosure - false positive on the hashes of the Expo bundle)

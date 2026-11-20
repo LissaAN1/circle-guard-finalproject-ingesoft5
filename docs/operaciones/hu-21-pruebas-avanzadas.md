@@ -53,7 +53,8 @@ Script: [`ci/scripts/zap-run.sh`](../../ci/scripts/zap-run.sh), con la imagen `z
 
 Reglas en [`ci/zap/rules.tsv`](../../ci/zap/rules.tsv):
 
-- **FAIL:** cookies sin `HttpOnly` o `Secure` (10010, 10011), información sensible en la URL (10024) y divulgación de datos personales (10062). En un sistema de salud con identidad anónima, cualquiera de ellas es un defecto que no debe llegar a producción.
+- **FAIL:** cookies sin `HttpOnly` (10010), información sensible en la URL (10024) y divulgación de datos personales (10062). En un sistema de salud con identidad anónima, cualquiera de ellas es un defecto que no debe llegar a producción.
+- **WARN explícito:** cookie sin `Secure` (10011). Stage se sirve por HTTP, así que con FAIL bloquearía siempre que haya una cookie; pasa a FAIL cuando el Ingress tenga TLS.
 - **IGNORE:** divulgación de marcas de tiempo (10096). Es un falso positivo con los hashes del bundle de Expo.
 - **WARN:** el resto, por defecto.
 

@@ -136,3 +136,27 @@ variable "registry_password_parameter" {
   type        = string
   default     = null
 }
+
+variable "monthly_limit_usd" {
+  description = "Monthly cost budget of the stage environment, in USD."
+  type        = number
+  default     = 40
+}
+
+variable "scale_to_zero_enabled" {
+  description = "Stop the nodes outside working hours (FinOps). Set false while the environment is in use at night."
+  type        = bool
+  default     = true
+}
+
+variable "stop_schedule" {
+  description = "Cron expression (America/Bogota) that stops the nodes."
+  type        = string
+  default     = "cron(0 20 * * ? *)"
+}
+
+variable "start_schedule" {
+  description = "Cron expression (America/Bogota) that starts the nodes on working days."
+  type        = string
+  default     = "cron(0 7 ? * MON-FRI *)"
+}

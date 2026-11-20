@@ -78,6 +78,20 @@ module "observability" {
   alarm_email        = var.alarm_email
 }
 
+module "finops" {
+  source = "../../modules/finops"
+
+  name                  = local.name
+  environment           = local.environment
+  monthly_limit_usd     = var.monthly_limit_usd
+  alert_emails          = var.alarm_email == "" ? [] : [var.alarm_email]
+  instances             = local.monitored_instances
+  scale_to_zero_enabled = var.scale_to_zero_enabled
+  stop_schedule         = var.stop_schedule
+  start_schedule        = var.start_schedule
+}
+
+
 # Optional for mock plans; mandatory in the Jenkins Kubernetes release tfvars.
 module "cicd_link" {
   count  = var.cicd_vpc_id == null ? 0 : 1

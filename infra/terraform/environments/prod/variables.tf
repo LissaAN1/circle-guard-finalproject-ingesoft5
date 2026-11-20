@@ -136,3 +136,9 @@ variable "registry_password_parameter" {
   type        = string
   default     = null
 }
+
+variable "monthly_limit_usd" {
+  description = "Monthly cost budget of the prod environment, in USD."
+  type        = number
+  default     = 80
+}

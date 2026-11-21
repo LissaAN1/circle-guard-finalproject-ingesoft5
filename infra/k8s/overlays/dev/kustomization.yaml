@@ -20,6 +20,21 @@ configMapGenerator:
       disableNameSuffixHash: true
 
 patches:
+  # HU-23: the Linkerd proxy is injected into every Deployment of dev (the databases and brokers stay out of the mesh).
+  # Without Linkerd installed the annotation is ignored. Requests are tiny: the dev node has 2 vCPU.
+  - target: {kind: Deployment}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: any
+      spec:
+        template:
+          metadata:
+            annotations:
+              linkerd.io/inject: enabled
+              config.linkerd.io/proxy-cpu-request: 2m
+              config.linkerd.io/proxy-memory-request: 16Mi
   # Autoscaling bounds of the dev environment for every HPA.
   - target: {kind: HorizontalPodAutoscaler}
     patch: |-

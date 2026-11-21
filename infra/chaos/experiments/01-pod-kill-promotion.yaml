@@ -1,0 +1,14 @@
+# Experiment 1 - self-healing. Hypothesis: with 2+ replicas, killing one promotion pod does not take the service
+# down: the Deployment recreates it, promotion keeps answering from the other replica and ServiceDown stays silent.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-kill-promotion
+  namespace: circleguard-dev
+spec:
+  action: pod-kill
+  mode: one
+  selector:
+    namespaces: [circleguard-dev]
+    labelSelectors:
+      app.kubernetes.io/name: promotion

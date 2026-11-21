@@ -1,0 +1,16 @@
+# Experiment 2 - alerting. Hypothesis: when every identity pod stops answering for 3 minutes, Prometheus sees
+# up == 0 and the critical alert ServiceDown (HU-17) fires within 2 minutes; when the experiment ends the pods
+# recover by themselves and the alert resolves.
+apiVersion: chaos-mesh.org/v1alpha1
+kind: PodChaos
+metadata:
+  name: pod-failure-identity
+  namespace: circleguard-dev
+spec:
+  action: pod-failure
+  mode: all
+  duration: 3m
+  selector:
+    namespaces: [circleguard-dev]
+    labelSelectors:
+      app.kubernetes.io/name: identity

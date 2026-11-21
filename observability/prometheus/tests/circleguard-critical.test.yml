@@ -1,0 +1,121 @@
+# Prueba unitaria de las reglas (desde observability/prometheus/tests):
+#   promtool test rules circleguard-critical.test.yml
+# "1x8" son 9 muestras (0 a 120 s): una alerta con for: 1m que empieza a fallar en t=135 s dispara en t=195 s.
+rule_files:
+  - ../rules/circleguard-critical.rules.yml
+evaluation_interval: 15s
+tests:
+  # --- ServiceDown: el pod existe pero deja de responder (up == 0)
+  - interval: 15s
+    input_series:
+      - series: 'up{job="circleguard-services", service="auth", application="circleguard-auth-service", instance="10.42.0.10:8080", pod="auth-abc"}'
+        values: '1x8 0x20'
+      - series: 'up{job="circleguard-services", service="identity", application="circleguard-identity-service", instance="10.42.0.11:8080", pod="identity-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="promotion", application="circleguard-promotion-service", instance="10.42.0.12:8080", pod="promotion-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="form", application="circleguard-form-service", instance="10.42.0.13:8080", pod="form-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="gateway", application="circleguard-gateway-service", instance="10.42.0.14:8080", pod="gateway-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="dashboard", application="circleguard-dashboard-service", instance="10.42.0.15:8080", pod="dashboard-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="file", application="circleguard-file-service", instance="10.42.0.16:8080", pod="file-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="notification", application="circleguard-notification-service", instance="10.42.0.17:8080", pod="notification-abc"}'
+        values: '1x28'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: circleguard-services, service: auth, application: circleguard-auth-service, instance: "10.42.0.10:8080", pod: auth-abc}
+            exp_annotations:
+              summary: "El servicio auth no responde"
+              description: "Sin respuesta en /actuator/prometheus o sin pods en ejecucion durante mas de 1 minuto."
+  # --- ServiceDown: el servicio no tiene pods (Deployment escalado a 0): auth no aparece en up
+  - interval: 15s
+    input_series:
+      - series: 'up{job="circleguard-services", service="identity", application="circleguard-identity-service", instance="10.42.0.11:8080", pod="identity-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="promotion", application="circleguard-promotion-service", instance="10.42.0.12:8080", pod="promotion-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="form", application="circleguard-form-service", instance="10.42.0.13:8080", pod="form-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="gateway", application="circleguard-gateway-service", instance="10.42.0.14:8080", pod="gateway-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="dashboard", application="circleguard-dashboard-service", instance="10.42.0.15:8080", pod="dashboard-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="file", application="circleguard-file-service", instance="10.42.0.16:8080", pod="file-abc"}'
+        values: '1x28'
+      - series: 'up{job="circleguard-services", service="notification", application="circleguard-notification-service", instance="10.42.0.17:8080", pod="notification-abc"}'
+        values: '1x28'
+    alert_rule_test:
+      - eval_time: 30s
+        alertname: ServiceDown
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ServiceDown
+        exp_alerts:
+          - exp_labels: {severity: critical, job: circleguard-services, service: auth}
+            exp_annotations:
+              summary: "El servicio auth no responde"
+              description: "Sin respuesta en /actuator/prometheus o sin pods en ejecucion durante mas de 1 minuto."
+  # --- HighErrorRate: 1 req/s en total; desde el minuto 1,5 un tercio son 5xx
+  - interval: 15s
+    input_series:
+      - series: 'http_server_requests_seconds_count{application="circleguard-form-service", outcome="SUCCESS", uri="/api/v1/surveys"}'
+        values: '0+10x80'
+      - series: 'http_server_requests_seconds_count{application="circleguard-form-service", outcome="SERVER_ERROR", uri="/api/v1/surveys"}'
+        values: '0x4 0+5x80'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: HighErrorRate
+        exp_alerts: []
+      - eval_time: 7m
+        alertname: HighErrorRate
+        exp_alerts:
+          - exp_labels: {severity: critical, application: circleguard-form-service}
+            exp_annotations:
+              summary: "circleguard-form-service: mas de 5 % de respuestas 5xx"
+              description: "Tasa de error 33.33% en los ultimos 2 minutos (trafico minimo 0,1 req/s)."
+  # --- CircuitBreakerOpen: el circuito 'identity' de auth se abre en t=75 s
+  - interval: 15s
+    input_series:
+      - series: 'resilience4j_circuitbreaker_state{application="circleguard-auth-service", name="identity", state="open"}'
+        values: '0x4 1x20'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: CircuitBreakerOpen
+        exp_alerts: []
+      - eval_time: 4m
+        alertname: CircuitBreakerOpen
+        exp_alerts:
+          - exp_labels: {severity: critical, application: circleguard-auth-service, name: identity, state: open}
+            exp_annotations:
+              summary: "circleguard-auth-service: circuit breaker 'identity' abierto"
+              description: "El servicio rechaza las llamadas a su dependencia porque fallan de forma sostenida (ver HU-14)."
+  # --- HighLatencyP95 (warning): 1 req/s; desde el minuto 1 todas tardan entre 2 s y 5 s
+  - interval: 15s
+    input_series:
+      - series: 'http_server_requests_seconds_bucket{application="circleguard-promotion-service", uri="/api/v1/health/status", le="2.0"}'
+        values: '0+15x4 60x80'
+      - series: 'http_server_requests_seconds_bucket{application="circleguard-promotion-service", uri="/api/v1/health/status", le="5.0"}'
+        values: '0+15x80'
+      - series: 'http_server_requests_seconds_bucket{application="circleguard-promotion-service", uri="/api/v1/health/status", le="+Inf"}'
+        values: '0+15x80'
+      - series: 'http_server_requests_seconds_count{application="circleguard-promotion-service", uri="/api/v1/health/status"}'
+        values: '0+15x80'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: HighLatencyP95
+        exp_alerts: []
+      - eval_time: 12m
+        alertname: HighLatencyP95
+        exp_alerts:
+          - exp_labels: {severity: warning, application: circleguard-promotion-service}
+            exp_annotations:
+              summary: "circleguard-promotion-service: p95 de latencia > 2 s"
+              description: "p95 actual: 4.85s."

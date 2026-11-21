@@ -1,0 +1,24 @@
+# Validacion LOCAL de HU-17 (mientras HU-11 no despliega los 8 servicios).
+# Los servicios corren en el host (./gradlew :services:...:bootRun, con docker-compose.dev.yml para el middleware);
+# Prometheus y Alertmanager corren en contenedores y leen el host via host.docker.internal.
+#   mkdir -p .alertmanager-secrets && echo "http://localhost:9/none" > .alertmanager-secrets/webhook_url
+#   docker compose -f observability/compose.local.yaml up -d
+# No sustituye la evidencia en ambientes desplegados (la rubrica solo califica lo verificable en pipeline/ambientes).
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command: [--config.file=/etc/prometheus/prometheus.yml, --enable-feature=expand-external-labels]
+    environment: {ENVIRONMENT: local}
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./prometheus/targets/services-local.yml:/etc/prometheus/targets/services.yml:ro
+    ports: ["127.0.0.1:9090:9090"]
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command: [--config.file=/etc/alertmanager/alertmanager.yml]
+    volumes:
+      - ./alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ../.alertmanager-secrets:/etc/alertmanager/secrets:ro
+    ports: ["127.0.0.1:9093:9093"]

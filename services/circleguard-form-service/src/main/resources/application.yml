@@ -27,17 +27,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: never
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
     tracing:
-      sampling:
-        probability: ${OTEL_TRACING_SAMPLING_PROBABILITY:1.0}
-    otlp:
-      tracing:
-        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
 
-  logging:
-    pattern:
-      level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

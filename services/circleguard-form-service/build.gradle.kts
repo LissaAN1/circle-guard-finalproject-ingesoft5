@@ -22,4 +22,6 @@ dependencies {
     testImplementation("org.testcontainers:kafka")
     testImplementation("org.awaitility:awaitility")
     testRuntimeOnly("org.postgresql:postgresql")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 }

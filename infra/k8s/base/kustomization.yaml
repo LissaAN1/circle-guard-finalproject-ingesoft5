@@ -29,6 +29,7 @@ resources:
   - hpa/notification.yaml
   - hpa/web.yaml
   - ingress.yaml
+  - jaeger.yaml
 
 configMapGenerator:
   - name: postgres-init

@@ -29,6 +29,10 @@ spring:
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: "*"
+    template:
+      observation-enabled: true
+    listener:
+      observation-enabled: true
   data:
     redis:
       host: ${SPRING_DATA_REDIS_HOST:localhost}
@@ -50,3 +54,13 @@ management:
   endpoint:
     health:
       show-details: never
+  tracing:
+    sampling:
+      probability: ${OTEL_TRACING_SAMPLING_PROBABILITY:1.0}
+  otlp:
+    tracing:
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+logging:
+  pattern:
+    level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

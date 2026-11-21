@@ -29,11 +29,22 @@ server:
   port: 8084
 
 management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
   health:
     redis:
       # HU-16: Redis is an optional cache. If Actuator is added, a Redis outage must not mark the
       # dashboard DOWN (and get it restarted by its probes); the cache is skipped instead.
       enabled: false
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
 
 circleguard:
   dashboard:

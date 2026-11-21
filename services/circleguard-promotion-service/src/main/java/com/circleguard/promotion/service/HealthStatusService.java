@@ -4,6 +4,8 @@ import com.circleguard.promotion.exception.FenceException;
 import com.circleguard.promotion.repository.graph.UserNodeRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.circleguard.promotion.metrics.PromotionMetrics;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.neo4j.core.Neo4jClient;
@@ -24,6 +26,10 @@ public class HealthStatusService {
     private final com.circleguard.promotion.repository.jpa.SystemSettingsRepository systemSettingsRepository;
     private final com.circleguard.promotion.repository.graph.CircleNodeRepository circleNodeRepository;
 
+    // Opcional: si no hay registro de metricas (p. ej. pruebas unitarias manuales) el flujo de negocio no cambia.
+    @Autowired(required = false)
+    private PromotionMetrics metrics;
+
     private static final String STATUS_KEY_PREFIX = "user:status:";
     private static final String TOPIC_STATUS_CHANGED = "promotion.status.changed";
 
@@ -38,6 +44,19 @@ public class HealthStatusService {
     @Transactional("neo4jTransactionManager")
     @CacheEvict(cacheNames = "userStatus", allEntries = true)
     public void updateStatus(String anonymousId, String status, boolean adminOverride) {
+        long startNanos = System.nanoTime();
+        boolean success = false;
+        try {
+            applyStatusUpdate(anonymousId, status, adminOverride);
+            success = true;
+        } finally {
+            if (metrics != null) {
+                metrics.recordContainment(System.nanoTime() - startNanos, success);
+            }
+        }
+    }
+
+    private void applyStatusUpdate(String anonymousId, String status, boolean adminOverride) {
         log.info("Updating status: {} -> {} (Admin Override: {})", anonymousId, status, adminOverride);
 
         if ("ACTIVE".equals(status) && !adminOverride) {
@@ -122,6 +141,9 @@ public class HealthStatusService {
             payload.put("timestamp", System.currentTimeMillis());
 
             kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
+            if (metrics != null) {
+                metrics.recordPromotion(status);
+            }
 
             // Story 5.4: Automated Room Reservation Cancellation
             checkAndBroadcastFencedCircles(anonymousId);

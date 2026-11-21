@@ -35,6 +35,8 @@ subprojects {
         "implementation"("org.jetbrains.kotlin:kotlin-reflect")
         "testImplementation"("org.springframework.boot:spring-boot-starter-test")
         "testRuntimeOnly"("com.h2database:h2")
+        "implementation"("org.springframework.boot:spring-boot-starter-actuator")
+        "runtimeOnly"("io.micrometer:micrometer-registry-prometheus")
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {

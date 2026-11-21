@@ -16,7 +16,17 @@ suspend_hpa() {
   hpa_name="$(kc -n "$NS" get hpa "$service" --ignore-not-found -o name 2>/dev/null || true)"
   if [[ -n "$hpa_name" ]]; then
     echo "[$(date -Is)] Respaldando HPA de $service"
-    if ! kc -n "$NS" get hpa "$service" -o yaml > "$backup_file" || [[ ! -s "$backup_file" ]]; then
+    # The saved object is re-created later: drop the fields the API server owns (uid, resourceVersion,
+    # status...) or it rejects the create with "resourceVersion should not be set on objects to be created".
+    if ! kc -n "$NS" get hpa "$service" -o json | python3 -c '
+import json, sys
+obj = json.load(sys.stdin)
+meta = obj.get("metadata", {})
+for key in ("uid", "resourceVersion", "generation", "creationTimestamp", "managedFields", "selfLink"):
+    meta.pop(key, None)
+obj.pop("status", None)
+json.dump(obj, sys.stdout)
+' > "$backup_file" || [[ ! -s "$backup_file" ]]; then
       echo "Error: no se pudo obtener un respaldo valido del HPA para $service" >&2
       exit 1
     fi

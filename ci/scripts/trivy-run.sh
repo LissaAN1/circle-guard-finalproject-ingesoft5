@@ -4,7 +4,7 @@
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 mode="${1:-}"
-case "$mode" in iac|images) ;; *) echo 'Usage: hu13-trivy.sh iac|images' >&2; exit 2;; esac
+case "$mode" in iac|images|secrets) ;; *) echo 'Usage: trivy-run.sh iac|images|secrets' >&2; exit 2;; esac
 cd "$ROOT"
 image="${CG_TRIVY_IMAGE:-aquasec/trivy:0.76.2}"
 mkdir -p ci/reports/trivy ci/.trivy-cache
@@ -19,7 +19,7 @@ if [[ "$mode" == iac ]]; then
     --severity CRITICAL --exit-code 1 \
     --format json --output ci/reports/trivy/iac.json infra/terraform
   echo 'Trivy IaC scan completed without CRITICAL findings'
-else
+elif [[ "$mode" == images ]]; then
   : "${CG_IMAGE_TAG:?CG_IMAGE_TAG required for image scanning}"
   : "${CG_UNITS:?CG_UNITS required for image scanning}"
   [[ "$CG_IMAGE_TAG" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]{0,127}$ ]] || exit 2
@@ -35,4 +35,31 @@ else
       "circleguard/${name}:${CG_IMAGE_TAG}"
     echo "Trivy image scan passed: $unit"
   done
+else
+  # Keep finding details in a temporary file. A secret value must not appear
+  # in Jenkins logs, archived artifacts, or the repository.
+  umask 077
+  report="$(mktemp "$PWD/ci/.secret-scan.XXXXXX")"
+  trap 'rm -f -- "$report"' EXIT
+  status=0
+  scan fs --scanners secret --exit-code 1 --quiet \
+    --format json --output "$report" . || status=$?
+  if (( status != 0 )); then
+    # Print only file paths and rule IDs, never matched secret contents.
+    python - "$report" <<'PY_REDACTED'
+import json
+import sys
+try:
+    with open(sys.argv[1], encoding='utf-8') as stream:
+        data = json.load(stream)
+    for result in data.get('Results', []):
+        for finding in result.get('Secrets') or []:
+            print(f"{result.get('Target', '?')}: {finding.get('RuleID', 'secret detected')}")
+except (OSError, ValueError):
+    print('Secret scanner failed; review the scanner configuration privately.')
+PY_REDACTED
+    echo 'Trivy secret scan blocked the pipeline' >&2
+    exit "$status"
+  fi
+  echo 'Trivy secret scan passed: no findings'
 fi

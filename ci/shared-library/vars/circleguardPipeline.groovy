@@ -23,6 +23,10 @@ def call() {
             stage('Checkout') {
                 steps { cgCheckout() }
             }
+            // Scan every branch and pull request before build or publication.
+            stage('Trivy Secrets') {
+                steps { cgTrivy(mode: 'secrets') }
+            }
             stage('Detect changes') {
                 steps { cgDetectChanges() }
             }

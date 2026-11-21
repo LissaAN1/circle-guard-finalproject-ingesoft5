@@ -73,7 +73,7 @@ Los scripts nunca usan el contexto actual de `kubectl`. Actúan sobre `KUBE_CONT
 | `/` | `web:80` | Cliente web. |
 | `/gateway` | `gateway:8087` | Un `Middleware` de Traefik (`strip-gateway`) quita el prefijo `/gateway` antes de llegar al servicio. Su anotación lleva el namespace del ambiente (`circleguard-<ambiente>-strip-gateway@kubernetescrd`), que cada overlay fija. |
 
-Sin dominio, se accede por la IP pública del servidor (`server_public_ip` de Terraform): `http://<ip>/` y `http://<ip>/gateway/actuator/health`. Los Ingress no tienen `host`; si más adelante hay DNS, se agrega por overlay. No hay TLS en este avance.
+Ambos Ingress utilizan `websecure` (443), con los hosts estables `dev.circleguard.test`, `stage.circleguard.test` y `prod.circleguard.test` y un Secret `circleguard-ingress-tls` por namespace. Los certificados son emitidos por una CA privada (no pública) y se verifican con `openssl verify` y `curl --cacert`/`--resolve`; no se requiere DNS externo. Las claves y la CA privada permanecen fuera de Git, bajo `infra/k8s/tls/.private/`. El procedimiento está en `docs/operaciones/seguridad-plataforma.md`. El certificado no será confiable automáticamente para navegadores externos hasta instalar su CA en el almacén de confianza o adoptar un dominio con CA pública.
 
 **HPA.** Cada uno de los 8 servicios y `web` tiene un `HorizontalPodAutoscaler` (`autoscaling/v2`) por CPU, con objetivo del 70 % de la solicitud de CPU (`requests.cpu` de cada Deployment). Los Deployment ya no fijan `replicas`: el HPA manda, y así un nuevo `apply` no lo pisa. Sube sin espera (hasta 2 pods cada 30 s) y baja tras 180 s de calma. Requiere metrics-server, que k3s incluye.
 

@@ -12,12 +12,15 @@ metadata:
   name: jenkins-deployer
   namespace: NAMESPACE
 rules:
+  # Deploys and rollouts do not require shell access to application pods.
   - apiGroups: [""]
-    resources: ["pods", "services", "configmaps", "secrets", "persistentvolumeclaims"]
+    resources: ["services", "configmaps", "persistentvolumeclaims"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # The administrator creates this Secret once. Jenkins can refresh only that one.
   - apiGroups: [""]
-    resources: ["pods/exec", "pods/portforward"]
-    verbs: ["create"]
+    resources: ["secrets"]
+    resourceNames: ["circleguard-secrets"]
+    verbs: ["get", "update", "patch"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch"]

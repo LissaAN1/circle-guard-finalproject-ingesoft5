@@ -35,3 +35,30 @@ patches:
       - op: replace
         path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares
         value: circleguard-stage-strip-gateway@kubernetescrd
+  # Both publicly reachable routes require a hostname and the same TLS Secret.
+  - target: {kind: Ingress, name: circleguard-web}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
+        value: websecure
+      - op: add
+        path: /spec/rules/0/host
+        value: stage.circleguard.test
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts: [stage.circleguard.test]
+            secretName: circleguard-ingress-tls
+  - target: {kind: Ingress, name: circleguard-gateway}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
+        value: websecure
+      - op: add
+        path: /spec/rules/0/host
+        value: stage.circleguard.test
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts: [stage.circleguard.test]
+            secretName: circleguard-ingress-tls

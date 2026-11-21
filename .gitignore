@@ -84,3 +84,6 @@ infra/environments/.env.*
 *.tfplan
 # HU-17: Alertmanager secrets directory
 .alertmanager-secrets/
+
+# HU-23: Linkerd trust anchor and issuer keys are never versioned.
+infra/mesh/.private/

@@ -1,0 +1,80 @@
+# HU-23 demo, dev only: strict mTLS and a canary between two versions of one service.
+#  - the namespace injects the proxy and its default inbound policy is all-authenticated, so a client
+#    without a mesh identity (no mTLS) is rejected;
+#  - Service "hello" is routed by an HTTPRoute that sends 90 % of the requests to hello-v1 and 10 % to hello-v2.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mesh-demo
+  annotations:
+    linkerd.io/inject: enabled
+    config.linkerd.io/default-inbound-policy: all-authenticated
+    config.linkerd.io/proxy-cpu-request: 2m
+    config.linkerd.io/proxy-memory-request: 16Mi
+  labels:
+    app.kubernetes.io/part-of: circleguard
+    circleguard/environment: dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hello-v1, namespace: mesh-demo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hello, version: v1}}
+  template:
+    metadata: {labels: {app: hello, version: v1}}
+    spec:
+      containers:
+        - name: echo
+          image: hashicorp/http-echo:1.0
+          args: ["-listen=:5678", "-text=hello from v1"]
+          ports: [{containerPort: 5678}]
+          resources: {requests: {cpu: 2m, memory: 8Mi}, limits: {cpu: 50m, memory: 32Mi}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: hello-v2, namespace: mesh-demo}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: hello, version: v2}}
+  template:
+    metadata: {labels: {app: hello, version: v2}}
+    spec:
+      containers:
+        - name: echo
+          image: hashicorp/http-echo:1.0
+          args: ["-listen=:5678", "-text=hello from v2"]
+          ports: [{containerPort: 5678}]
+          resources: {requests: {cpu: 2m, memory: 8Mi}, limits: {cpu: 50m, memory: 32Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: hello, namespace: mesh-demo}
+spec:
+  selector: {app: hello}
+  ports: [{name: http, port: 80, targetPort: 5678}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: hello-v1, namespace: mesh-demo}
+spec:
+  selector: {app: hello, version: v1}
+  ports: [{name: http, port: 80, targetPort: 5678}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: hello-v2, namespace: mesh-demo}
+spec:
+  selector: {app: hello, version: v2}
+  ports: [{name: http, port: 80, targetPort: 5678}]
+---
+apiVersion: policy.linkerd.io/v1beta3
+kind: HTTPRoute
+metadata: {name: hello-canary, namespace: mesh-demo}
+spec:
+  parentRefs:
+    - {group: core, kind: Service, name: hello, port: 80}
+  rules:
+    - backendRefs:
+        - {name: hello-v1, port: 80, weight: 90}
+        - {name: hello-v2, port: 80, weight: 10}

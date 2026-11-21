@@ -23,28 +23,46 @@ spec:
             - name: http
               containerPort: 8086
           env:
-            - {name: SPRING_DATASOURCE_URL, value: "jdbc:postgresql://postgres:5432/circleguard_form"}
-            - {name: SPRING_DATASOURCE_USERNAME, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_USER}}}
-            - {name: SPRING_DATASOURCE_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_PASSWORD}}}
-            - {name: SPRING_KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092"}
+            - {
+                name: SPRING_DATASOURCE_URL,
+                value: "jdbc:postgresql://postgres:5432/circleguard_form",
+              }
+            - {
+                name: SPRING_DATASOURCE_USERNAME,
+                valueFrom:
+                  { secretKeyRef: { name: circleguard-secrets, key: DB_USER } },
+              }
+            - {
+                name: SPRING_DATASOURCE_PASSWORD,
+                valueFrom:
+                  {
+                    secretKeyRef:
+                      { name: circleguard-secrets, key: DB_PASSWORD },
+                  },
+              }
+            - { name: SPRING_KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - {
+                name: OTEL_EXPORTER_OTLP_ENDPOINT,
+                value: "http://jaeger:4318/v1/traces",
+              }
           startupProbe:
-            httpGet: {path: /actuator/health, port: http}
+            httpGet: { path: /actuator/health, port: http }
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 30
           readinessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            httpGet: { path: /actuator/health, port: http }
             periodSeconds: 10
             timeoutSeconds: 5
             failureThreshold: 3
           livenessProbe:
-            httpGet: {path: /actuator/health, port: http}
+            httpGet: { path: /actuator/health, port: http }
             periodSeconds: 30
             timeoutSeconds: 5
             failureThreshold: 5
           resources:
-            requests: {cpu: 100m, memory: 256Mi}
-            limits: {cpu: "1", memory: 768Mi}
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 768Mi }
 ---
 apiVersion: v1
 kind: Service

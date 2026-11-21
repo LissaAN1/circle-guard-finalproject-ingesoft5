@@ -32,4 +32,6 @@ dependencies {
     testImplementation("org.testcontainers:neo4j")
     testImplementation("org.awaitility:awaitility")
     testImplementation("org.testcontainers:kafka")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 }

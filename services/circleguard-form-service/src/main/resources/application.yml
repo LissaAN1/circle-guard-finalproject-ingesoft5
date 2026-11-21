@@ -17,6 +17,8 @@ spring:
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+    template:
+      observation-enabled: true
 
 server:
   port: 8086
@@ -29,3 +31,13 @@ management:
   endpoint:
     health:
       show-details: never
+    tracing:
+      sampling:
+        probability: ${OTEL_TRACING_SAMPLING_PROBABILITY:1.0}
+    otlp:
+      tracing:
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
+
+  logging:
+    pattern:
+      level: "%5p [${spring.application.name:},%X{traceId:-},%X{spanId:-}]"

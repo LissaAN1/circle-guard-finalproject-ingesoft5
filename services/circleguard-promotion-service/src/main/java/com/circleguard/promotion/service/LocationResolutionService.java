@@ -2,8 +2,10 @@ package com.circleguard.promotion.service;
 
 import com.circleguard.promotion.model.AccessPoint;
 import com.circleguard.promotion.repository.jpa.AccessPointRepository;
+import com.circleguard.promotion.metrics.PromotionMetrics;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,10 @@ public class LocationResolutionService {
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final StringRedisTemplate redisTemplate;
 
+    // Opcional: las pruebas que construyen el servicio con new siguen funcionando sin metricas.
+    @Autowired(required = false)
+    private PromotionMetrics metrics;
+
     private static final String TOPIC_PROXIMITY_DETECTED = "proximity.detected";
     private static final String SPATIAL_PREFIX = "spatial:location:";
 
@@ -32,6 +38,7 @@ public class LocationResolutionService {
                 .orElse(null);
         if (ap == null) {
             log.warn("Unknown Access Point detected: {}", apMac);
+            recordCheckIn("unknown_access_point");
             return;
         }
 
@@ -40,6 +47,7 @@ public class LocationResolutionService {
         if (anonymousId == null) {
             // Devices with randomized MACs not currently in an active app session are ignored
             log.debug("Unmapped MAC detected: {}. Monitoring only.", deviceMac);
+            recordCheckIn("unmapped_device");
             return;
         }
 
@@ -60,6 +68,13 @@ public class LocationResolutionService {
         updateGraph(ap.getId().toString(), anonymousId);
         
         log.info("Proximity Resolved: User {} is near AP {} (Floor {})", anonymousId, ap.getName(), ap.getFloor().getFloorNumber());
+        recordCheckIn("resolved");
+    }
+
+    private void recordCheckIn(String result) {
+        if (metrics != null) {
+            metrics.recordCheckIn(result);
+        }
     }
 
     private void updateGraph(String locationId, String anonymousId) {

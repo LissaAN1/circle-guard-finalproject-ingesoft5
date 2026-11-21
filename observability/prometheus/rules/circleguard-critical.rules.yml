@@ -1,0 +1,62 @@
+# HU-17 / PI-132 - alertas. Las criticas tienen prueba unitaria (tests/) y prueba de falla real (scripts/).
+groups:
+  - name: circleguard-critical
+    rules:
+      # El servicio no responde (pod vivo que no contesta) o no tiene ningun pod (Deployment en 0, pods eliminados).
+      - alert: ServiceDown
+        expr: |
+          up{job="circleguard-services"} == 0
+          or absent(up{job="circleguard-services", service="auth"})
+          or absent(up{job="circleguard-services", service="identity"})
+          or absent(up{job="circleguard-services", service="promotion"})
+          or absent(up{job="circleguard-services", service="form"})
+          or absent(up{job="circleguard-services", service="gateway"})
+          or absent(up{job="circleguard-services", service="dashboard"})
+          or absent(up{job="circleguard-services", service="file"})
+          or absent(up{job="circleguard-services", service="notification"})
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "El servicio {{ $labels.service }} no responde"
+          description: "Sin respuesta en /actuator/prometheus o sin pods en ejecucion durante mas de 1 minuto."
+
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum by (application) (rate(http_server_requests_seconds_count{outcome="SERVER_ERROR", uri!~"/actuator.*"}[2m]))
+            /
+            sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[2m]))
+          ) > 0.05
+          and
+          sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[2m])) > 0.1
+        for: 2m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.application }}: mas de 5 % de respuestas 5xx"
+          description: "Tasa de error {{ $value | humanizePercentage }} en los ultimos 2 minutos (trafico minimo 0,1 req/s)."
+
+      # HU-14: el circuito se abre cuando la dependencia (identity, promotion) falla de forma sostenida.
+      - alert: CircuitBreakerOpen
+        expr: max_over_time(resilience4j_circuitbreaker_state{state="open"}[1m]) == 1
+        for: 1m
+        labels: {severity: critical}
+        annotations:
+          summary: "{{ $labels.application }}: circuit breaker '{{ $labels.name }}' abierto"
+          description: "El servicio rechaza las llamadas a su dependencia porque fallan de forma sostenida (ver HU-14)."
+
+  - name: circleguard-warning
+    rules:
+      # Sin prueba de falla real (no hay forma limpia de provocar lentitud sin tumbar la salud del pod);
+      # solo prueba unitaria. No cuenta entre las 3 alertas criticas de HU-17.
+      - alert: HighLatencyP95
+        expr: |
+          histogram_quantile(0.95,
+            sum by (application, le) (rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m]))
+          ) > 2
+          and on (application)
+          sum by (application) (rate(http_server_requests_seconds_count{uri!~"/actuator.*"}[5m])) > 0.1
+        for: 3m
+        labels: {severity: warning}
+        annotations:
+          summary: "{{ $labels.application }}: p95 de latencia > 2 s"
+          description: "p95 actual: {{ $value | humanizeDuration }}."

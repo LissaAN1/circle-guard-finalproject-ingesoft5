@@ -1,0 +1,43 @@
+# HU-17 / PI-131 - Prometheus dentro del namespace circleguard-<ambiente> (k3s, HU-11).
+# Descubre los pods (no los Services): con 2 replicas en prod, un target por Service
+# mezclaria las metricas de ambos pods en cada lectura.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: ${ENVIRONMENT}   # se expande con --enable-feature=expand-external-labels
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: circleguard-services
+    metrics_path: /actuator/prometheus
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          own_namespace: true
+    relabel_configs:
+      # Solo los 8 servicios Spring Boot (no web, que es Nginx, ni el middleware).
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: auth|identity|promotion|form|gateway|dashboard|file|notification
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: http
+        action: keep
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        target_label: service
+      - source_labels: [__meta_kubernetes_pod_label_app_kubernetes_io_name]
+        regex: (.+)
+        replacement: circleguard-$1-service
+        target_label: application
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

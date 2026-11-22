@@ -1,0 +1,33 @@
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: local-services
+    static_configs:
+      - {
+          targets: [localhost],
+          labels: { service: promotion, __path__: /local-logs/promotion.log },
+        }
+      - {
+          targets: [localhost],
+          labels: { service: auth, __path__: /local-logs/auth.log },
+        }
+      - {
+          targets: [localhost],
+          labels: { service: form, __path__: /local-logs/form.log },
+        }
+    pipeline_stages:
+      - multiline:
+          firstline: '^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}'
+          max_wait_time: 3s
+      - regex:
+          expression: '^\S+\s+(?P<level>TRACE|DEBUG|INFO|WARN|ERROR|FATAL)\s'
+      - labels:
+          level:

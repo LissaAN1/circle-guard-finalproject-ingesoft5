@@ -14,7 +14,7 @@ case "$env_name" in dev|stage|prod) ;; *) echo 'environment must be dev, stage o
 [[ "$CG_IMAGE_TAG" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]{0,127}$ ]] || exit 2
 export KUBE_CONTEXT="circleguard-${env_name}"
 export PATH="$ROOT/ci/scripts:$PATH"
-# hu13-kubectl.sh is called from an isolated wrapper named kubectl.
+# kubectl-run.sh is called from an isolated wrapper named kubectl.
 cd "$ROOT"
 dest="infra/environments/.env.${env_name}"
 [[ ! -e "$dest" ]] || { echo "Refusing to overwrite existing $dest" >&2; exit 1; }

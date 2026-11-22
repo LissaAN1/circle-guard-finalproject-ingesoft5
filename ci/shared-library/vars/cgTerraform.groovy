@@ -14,7 +14,7 @@ def call(Map cfg = [:]) {
     ]) {
         withEnv(["AWS_DEFAULT_REGION=${region}", "AWS_REGION=${region}"]) {
             sh(label: "terraform-${action}-${target}",
-                script: "bash ci/scripts/hu13-terraform.sh ${target} ${action}")
+                script: "bash ci/scripts/terraform-run.sh ${target} ${action}")
         }
     }
 }

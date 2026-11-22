@@ -30,6 +30,7 @@ module "network" {
   public_subnet_cidrs = var.public_subnet_cidrs
   availability_zones  = var.availability_zones
   admin_cidrs         = var.admin_cidrs
+  cicd_vpc_cidr       = var.cicd_vpc_cidr
 }
 
 module "compute" {

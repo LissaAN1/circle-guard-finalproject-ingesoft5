@@ -102,6 +102,29 @@ resource "aws_vpc_security_group_ingress_rule" "intra_cluster" {
   referenced_security_group_id = aws_security_group.cluster.id
 }
 
+# Private communication between nodes of the same K3s cluster.
+resource "aws_vpc_security_group_egress_rule" "intra_cluster" {
+  security_group_id            = aws_security_group.cluster.id
+  description                  = "Private traffic between K3s nodes"
+  ip_protocol                  = "-1"
+  referenced_security_group_id = aws_security_group.cluster.id
+}
+
+# Private access to the Nexus Docker registry through VPC peering.
+resource "aws_vpc_security_group_egress_rule" "nexus" {
+  count = var.cicd_vpc_cidr == null ? 0 : 1
+
+  security_group_id = aws_security_group.cluster.id
+  description       = "Private Nexus Docker registry access"
+  ip_protocol       = "tcp"
+  from_port         = 8082
+  to_port           = 8082
+  cidr_ipv4         = var.cicd_vpc_cidr
+}
+
+# Temporary lab exception: K3s requires outbound access for installation,
+# image pulls and external dependencies. Restrict before production use.
+# trivy:ignore:AWS-0104
 resource "aws_vpc_security_group_egress_rule" "all" {
   security_group_id = aws_security_group.cluster.id
   description       = "Outbound traffic"

@@ -71,3 +71,9 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
+
+variable "cicd_vpc_cidr" {
+  description = "CIDR of the CI/CD VPC for private Nexus access."
+  type        = string
+  default     = null
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# HU-22: ejecuta rollback de un Deployment o de todo el ambiente en Kubernetes.
+# HU-22: ejecuta rollback de un Deployment de un ambiente en Kubernetes.
 # Uso:
 #   bash infra/k8s/rollback.sh dev auth              # revierte solo auth a la revisión anterior
 #   bash infra/k8s/rollback.sh dev auth 2            # revierte auth a la revisión 2

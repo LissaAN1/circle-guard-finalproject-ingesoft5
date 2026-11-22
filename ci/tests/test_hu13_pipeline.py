@@ -25,6 +25,19 @@ def bash_path(path):
 
 
 class Hu13PipelineContract(unittest.TestCase):
+    def test_terraform_and_kubectl_entrypoints_exist(self):
+        terraform = (VARS / 'cgTerraform.groovy').read_text(encoding='utf8')
+        kubectl = (ROOT / 'ci/scripts/kubectl').read_text(encoding='utf8')
+        deploy = (ROOT / 'ci/scripts/k8s-run.sh').read_text(encoding='utf8')
+
+        self.assertIn('ci/scripts/terraform-run.sh', terraform)
+        self.assertTrue((ROOT / 'ci/scripts/terraform-run.sh').is_file())
+
+        self.assertIn('exec bash "$HERE/kubectl-run.sh" "$@"', kubectl)
+        self.assertTrue((ROOT / 'ci/scripts/kubectl-run.sh').is_file())
+
+        self.assertIn('export PATH="$ROOT/ci/scripts:$PATH"', deploy)
+
     def test_progressive_release_and_approval_order(self):
         code = (VARS / 'circleguardPipeline.groovy').read_text(encoding='utf8')
         ordered = [

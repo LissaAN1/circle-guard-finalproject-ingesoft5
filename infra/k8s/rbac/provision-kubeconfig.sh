@@ -50,10 +50,10 @@ chmod 600 "$output"
 unset token
 if [[ "$access" == deploy ]]; then
   KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create deployments | grep -qx yes
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods/exec | grep -qx no
+  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods --subresource=exec | grep -qx no
   KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create secrets | grep -qx no
 else
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods/exec | grep -qx yes
+  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods --subresource=exec | grep -qx yes
   KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create deployments | grep -qx no
   KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i get secrets | grep -qx no
 fi

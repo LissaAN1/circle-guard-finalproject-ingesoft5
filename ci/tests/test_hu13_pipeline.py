@@ -38,6 +38,18 @@ class Hu13PipelineContract(unittest.TestCase):
 
         self.assertIn('export PATH="$ROOT/ci/scripts:$PATH"', deploy)
 
+    def test_kubectl_wrapper_is_executable_in_git(self):
+        # k8s-run.sh puts ci/scripts first on PATH and manifests call `kubectl` directly, so the wrapper
+        # must be checked out executable (mode 100755). The disk mode is meaningless on Windows: use the index.
+        git = shutil.which('git')
+        if not git:
+            self.skipTest('git is required to read the index mode')
+        out = subprocess.run([git, 'ls-files', '-s', 'ci/scripts/kubectl'], cwd=ROOT,
+                             capture_output=True, text=True)
+        if out.returncode != 0 or not out.stdout.strip():
+            self.skipTest('not a git checkout')
+        self.assertTrue(out.stdout.startswith('100755'), out.stdout)
+
     def test_progressive_release_and_approval_order(self):
         code = (VARS / 'circleguardPipeline.groovy').read_text(encoding='utf8')
         ordered = [

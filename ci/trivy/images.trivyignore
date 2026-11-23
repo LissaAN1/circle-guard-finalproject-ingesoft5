@@ -1,4 +1,6 @@
 # Accepted Trivy findings. The CRITICAL gate stays on for everything else.
+# Used ONLY by trivy-run.sh images via --ignorefile. Never rename it to .trivyignore: Trivy
+# auto-loads that name in every scan (IaC and secrets included).
 # Full justification and review plan: docs/operaciones/excepciones-trivy.md
 # Each entry MUST carry an expiry date (exp:) so it cannot become permanent.
 

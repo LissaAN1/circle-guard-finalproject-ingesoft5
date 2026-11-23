@@ -219,5 +219,28 @@ class WebImageHardening(unittest.TestCase):
         self.assertEqual(users[-1], '101')
 
 
+class ProvisionKubeconfigContract(unittest.TestCase):
+    """`kubectl auth can-i` exits 1 on "no"; under pipefail `| grep -qx no` would fail on a correct denial."""
+
+    def script(self):
+        return (ROOT / 'infra/k8s/rbac/provision-kubeconfig.sh').read_text(encoding='utf8')
+
+    def test_permission_checks_compare_the_answer_not_the_exit_status(self):
+        script = self.script()
+        self.assertIn('set -euo pipefail', script)
+        self.assertIn('expect() {', script)
+        for line in script.splitlines():
+            if 'can-i' in line and not line.lstrip().startswith('#'):
+                self.assertNotIn('| grep', line, line)
+
+    def test_least_privilege_expectations_are_kept(self):
+        script = self.script()
+        for expected in ('expect yes -n "$ns" create deployments', 'expect no -n "$ns" create pods --subresource=exec',
+                         'expect no -n "$ns" create secrets', 'expect yes -n "$ns" create pods --subresource=exec',
+                         'expect no -n "$ns" create deployments', 'expect no -n "$ns" get secrets',
+                         'expect no create namespaces'):
+            self.assertIn(expected, script)
+
+
 if __name__ == '__main__':
     unittest.main()

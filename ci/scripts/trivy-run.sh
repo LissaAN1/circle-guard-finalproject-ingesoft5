@@ -29,12 +29,15 @@ elif [[ "$mode" == images ]]; then
   [[ "$CG_IMAGE_TAG" =~ ^[0-9A-Za-z][0-9A-Za-z._+-]{0,127}$ ]] || exit 2
   # The registry is not accessed here: Trivy scans exactly the images built
   # in the local Docker daemon before Jenkins is allowed to publish them.
+  # Accepted CVEs live in ci/trivy/images.trivyignore, a path Trivy never loads on its
+  # own (it auto-loads ./.trivyignore), so IaC and secret scans cannot inherit them.
   docker_gid="$(stat -c %g /var/run/docker.sock)"
   opts+=(--group-add "$docker_gid" -v /var/run/docker.sock:/var/run/docker.sock)
   for unit in $CG_UNITS; do
     [[ "$unit" =~ ^(auth|identity|promotion|notification|form|file|gateway|dashboard|web)$ ]] || { echo 'Invalid unit' >&2; exit 2; }
     name="$(bash ci/scripts/unit-info.sh "$unit" image)"
     scan image --image-src docker --scanners vuln --severity CRITICAL --exit-code 1 \
+      --ignorefile "$PWD/ci/trivy/images.trivyignore" \
       --format json --output "ci/reports/trivy/${unit}.json" \
       "circleguard/${name}:${CG_IMAGE_TAG}"
     echo "Trivy image scan passed: $unit"

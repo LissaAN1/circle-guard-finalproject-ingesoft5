@@ -2,7 +2,9 @@
 
 The tests never connect to AWS, Jenkins, Docker or a Kubernetes cluster.
 """
+import datetime
 import os
+import re
 import shutil
 import subprocess
 import tempfile
@@ -138,6 +140,45 @@ class IngressTlsContract(unittest.TestCase):
         for env in ('dev', 'stage', 'prod'):
             overlay = yaml.safe_load((ROOT / f'infra/k8s/overlays/{env}/kustomization.yaml').read_text())
             self.assertNotIn('secretGenerator', overlay)
+
+
+class TrivyIgnoreContract(unittest.TestCase):
+    """Accepted findings must stay narrow, time-boxed and image-scan only."""
+
+    IGNORE = ROOT / 'ci/trivy/images.trivyignore'
+    MAX_DAYS = 45
+
+    def entries(self):
+        lines = self.IGNORE.read_text(encoding='utf8').splitlines()
+        return [l.strip() for l in lines if l.strip() and not l.lstrip().startswith('#')]
+
+    def test_only_the_two_documented_spring_webmvc_cves_are_ignored(self):
+        ids = sorted(e.split()[0] for e in self.entries())
+        self.assertEqual(ids, ['CVE-2026-47884', 'CVE-2026-47890'])
+
+    def test_every_exception_has_a_real_future_expiry_within_the_window(self):
+        today = datetime.date.today()
+        for entry in self.entries():
+            match = re.fullmatch(r'(CVE-\d{4}-\d+) exp:(\d{4}-\d{2}-\d{2})', entry)
+            self.assertIsNotNone(match, entry)
+            expiry = datetime.date.fromisoformat(match.group(2))
+            self.assertGreater(expiry, today, f'{match.group(1)} exception expired: migrate or renew it on purpose')
+            self.assertLessEqual((expiry - today).days, self.MAX_DAYS, f'{match.group(1)} expiry too far away')
+
+    def test_no_default_trivyignore_that_every_scan_would_auto_load(self):
+        # Trivy loads ./.trivyignore on its own, so IaC and secret scans would inherit it.
+        self.assertFalse((ROOT / '.trivyignore').exists())
+
+    def test_only_image_scan_uses_the_ignore_file(self):
+        runner = (ROOT / 'ci/scripts/trivy-run.sh').read_text(encoding='utf8')
+        self.assertEqual(runner.count('--ignorefile'), 1)
+        before_images, images_and_rest = runner.split('elif [[ "$mode" == images ]]')
+        images_branch, secrets_branch = images_and_rest.split('\nelse')
+        self.assertIn('--ignorefile "$PWD/ci/trivy/images.trivyignore"', images_branch)
+        self.assertIn('--severity CRITICAL --exit-code 1', images_branch)
+        for other in (before_images, secrets_branch):
+            self.assertNotIn('ignorefile', other)
+            self.assertNotIn('trivyignore', other)
 
 
 if __name__ == '__main__':

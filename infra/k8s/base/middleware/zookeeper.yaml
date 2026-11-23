@@ -32,6 +32,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /var/lib/zookeeper/data
+            # The transaction log must persist too: without it a restart loses the
+            # latest changes, including the cluster id, and Kafka refuses to join.
+            - name: log
+              mountPath: /var/lib/zookeeper/log
           readinessProbe:
             tcpSocket: {port: main}
             initialDelaySeconds: 15
@@ -44,6 +48,13 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 1Gi
+    - metadata:
+        name: log
       spec:
         accessModes: [ReadWriteOnce]
         resources:

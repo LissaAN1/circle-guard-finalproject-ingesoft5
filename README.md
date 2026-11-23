@@ -123,7 +123,7 @@ CircleGuard follows a **Microservice Architecture** built on a **Hybrid Data Mod
 
 | Layer | Technology | Notas |
 |:---|:---|:---|
-| **Backend** | Spring Boot 3.2.4 / Java 21 / Kotlin 1.9.24 | El README original indicaba Spring Boot 4; la versión real está en `build.gradle.kts`. |
+| **Backend** | Spring Boot 3.5.16 / Java 21 / Kotlin 1.9.24 | El README original indicaba Spring Boot 4; la versión real está en `build.gradle.kts`. |
 | **Build** | Gradle 8.14 (Wrapper) / JaCoCo 0.8.12 | Toolchain Java 21. |
 | **Graph DB** | Neo4j 5.26 | |
 | **Relational DB** | PostgreSQL 16 | |

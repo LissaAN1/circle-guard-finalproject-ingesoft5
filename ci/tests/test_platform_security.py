@@ -181,5 +181,22 @@ class TrivyIgnoreContract(unittest.TestCase):
             self.assertNotIn('trivyignore', other)
 
 
+class DependencySecurityFloors(unittest.TestCase):
+    """Versions pinned over the Boot BOM to fix CRITICAL CVEs must not regress."""
+
+    @staticmethod
+    def version(name):
+        build = (ROOT / 'build.gradle.kts').read_text(encoding='utf8')
+        match = re.search(r'extra\["%s"\]\s*=\s*"([^"]+)"' % re.escape(name), build)
+        assert match, f'{name} override missing in build.gradle.kts'
+        return tuple(int(p) for p in re.findall(r'\d+', match.group(1)))
+
+    def test_tomcat_is_at_least_the_patched_release(self):
+        self.assertGreaterEqual(self.version('tomcat.version'), (10, 1, 58))
+
+    def test_netty_is_at_least_the_release_fixing_cve_2026_75595(self):
+        self.assertGreaterEqual(self.version('netty.version'), (4, 1, 137))
+
+
 if __name__ == '__main__':
     unittest.main()

@@ -48,14 +48,22 @@ users:
 EOF_KUBECONFIG
 chmod 600 "$output"
 unset token
+# `kubectl auth can-i` exits 1 when the answer is "no", which pipefail would turn into a failure exactly when
+# the permission is correctly denied. Compare the printed answer instead of the exit status.
+expect() {
+  local want="$1" answer
+  shift
+  answer="$(KUBECONFIG="$output" kubectl --context "$ns" auth can-i "$@" 2>/dev/null || true)"
+  [[ "$answer" == "$want" ]] || { printf 'Permission check failed: can-i %s -> %s (expected %s)\n' "$*" "${answer:-no answer}" "$want" >&2; exit 1; }
+}
 if [[ "$access" == deploy ]]; then
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create deployments | grep -qx yes
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods --subresource=exec | grep -qx no
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create secrets | grep -qx no
+  expect yes -n "$ns" create deployments
+  expect no -n "$ns" create pods --subresource=exec
+  expect no -n "$ns" create secrets
 else
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create pods --subresource=exec | grep -qx yes
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i create deployments | grep -qx no
-  KUBECONFIG="$output" kubectl --context "$ns" -n "$ns" auth can-i get secrets | grep -qx no
+  expect yes -n "$ns" create pods --subresource=exec
+  expect no -n "$ns" create deployments
+  expect no -n "$ns" get secrets
 fi
-KUBECONFIG="$output" kubectl --context "$ns" auth can-i create namespaces | grep -qx no
+expect no create namespaces
 printf 'Created restricted kubeconfig for %s; store as Jenkins file credential %s.\n' "$ns" "$credential"

@@ -242,5 +242,23 @@ class ProvisionKubeconfigContract(unittest.TestCase):
             self.assertIn(expected, script)
 
 
+class DevRolloutCapacity(unittest.TestCase):
+    """The dev node is a single 2 vCPU machine with its CPU requests nearly exhausted."""
+
+    OVERLAYS = Path(__file__).resolve().parents[2] / 'infra' / 'k8s' / 'overlays'
+
+    def test_dev_replaces_pods_in_place(self):
+        text = (self.OVERLAYS / 'dev' / 'kustomization.yaml').read_text(encoding='utf-8')
+        self.assertRegex(text, r'target: \{kind: Deployment\}\s+patch: \|-\s+apiVersion: apps/v1\s+kind: Deployment\s+metadata:\s+name: any\s+spec:\s+strategy:')
+        self.assertRegex(text, r'maxSurge: 0\b')
+        self.assertRegex(text, r'maxUnavailable: 1\b')
+
+    def test_other_environments_keep_the_default_surge(self):
+        for env in ('stage', 'prod'):
+            path = self.OVERLAYS / env / 'kustomization.yaml'
+            if path.exists():
+                self.assertNotIn('maxSurge: 0', path.read_text(encoding='utf-8'), env)
+
+
 if __name__ == '__main__':
     unittest.main()

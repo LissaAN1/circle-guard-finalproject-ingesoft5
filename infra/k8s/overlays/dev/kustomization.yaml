@@ -35,6 +35,21 @@ patches:
               linkerd.io/inject: enabled
               config.linkerd.io/proxy-cpu-request: 2m
               config.linkerd.io/proxy-memory-request: 16Mi
+  # The dev node has 2 vCPU and its pods already request about 98% of them, so a rolling update cannot start an extra
+  # pod per Deployment (the default maxSurge of 25% rounds up to one): the new pods stay Pending with "Insufficient cpu"
+  # and the rollout hits its progress deadline. Replace the pod in place instead. A short pause per app is fine in dev.
+  - target: {kind: Deployment}
+    patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: any
+      spec:
+        strategy:
+          type: RollingUpdate
+          rollingUpdate:
+            maxSurge: 0
+            maxUnavailable: 1
   # Autoscaling bounds of the dev environment for every HPA.
   - target: {kind: HorizontalPodAutoscaler}
     patch: |-

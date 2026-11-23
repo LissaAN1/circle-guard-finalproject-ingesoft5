@@ -19,6 +19,8 @@ subprojects {
     // Security: the Boot 3.5.16 BOM ships Tomcat 10.1.55, which still has CRITICAL CVEs (fixed in >= 10.1.58).
     // Picked up by the dependency-management plugin that each service applies.
     extra["tomcat.version"] = "10.1.62"
+    // Security: the Boot 3.5.16 BOM ships Netty 4.1.135, affected by CVE-2026-75595 (CRITICAL, fixed in >= 4.1.137).
+    extra["netty.version"] = "4.1.141.Final"
     apply(plugin = "java")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "jacoco")

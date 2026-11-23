@@ -5,6 +5,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -60,11 +61,18 @@ class RollbackSimulationTests(unittest.TestCase):
             newline="\n",
         )
         fake.chmod(0o755)
-        self.env = dict(
-            os.environ,
-            PATH=f"{bash_path(self.bin)}:/usr/bin:/bin",
-            MOCK_KUBECTL_LOG=bash_path(self.log),
-        )
+        self.env = self.clean_env()
+
+    def clean_env(self):
+        """Caller environment without the variables that pick a cluster.
+
+        rollback.sh honours KUBE_CONTEXT, so a developer shell that still exports
+        KUBE_CONTEXT=circleguard-stage would make the dev simulation look for the
+        wrong context. The tests must not depend on the shell that runs them.
+        """
+        env = {k: v for k, v in os.environ.items() if k not in ("KUBE_CONTEXT", "KUBECONFIG", "MOCK_CONTEXT")}
+        env.update(PATH=f"{bash_path(self.bin)}:/usr/bin:/bin", MOCK_KUBECTL_LOG=bash_path(self.log))
+        return env
 
     def run_rollback(self, *args, **extra):
         return subprocess.run(
@@ -83,6 +91,14 @@ class RollbackSimulationTests(unittest.TestCase):
         self.assertIn("--context circleguard-dev -n circleguard-dev rollout undo deployment/auth", log)
         self.assertIn("--context circleguard-dev -n circleguard-dev rollout status deployment/auth --timeout=300s", log)
         self.assertIn("get pods -l app.kubernetes.io/name=auth -o wide", log)
+
+    def test_ignores_cluster_variables_exported_in_the_callers_shell(self):
+        with unittest.mock.patch.dict(os.environ, {"KUBE_CONTEXT": "circleguard-stage", "KUBECONFIG": "/nonexistent"}):
+            self.env = self.clean_env()
+        res = self.run_rollback("dev", "auth")
+        self.assertEqual(res.returncode, 0, res.stderr)
+        self.assertIn("--context circleguard-dev -n circleguard-dev rollout undo deployment/auth",
+                      self.log.read_text(encoding="utf-8"))
 
     def test_rollback_to_specific_revision(self):
         res = self.run_rollback("dev", "auth", "2")

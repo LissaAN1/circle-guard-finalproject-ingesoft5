@@ -1,6 +1,6 @@
 # Excepciones del escaneo Trivy (imágenes)
 
-El gate de Trivy sigue bloqueando cualquier hallazgo **CRITICAL** en las imágenes. La única excepción vigente está en
+El gate de Trivy sigue bloqueando cualquier hallazgo **CRITICAL** en las imágenes. La única excepción vigente (tres CVE de Spring Framework 6.2.19) está en
 [`ci/trivy/images.trivyignore`](../../ci/trivy/images.trivyignore) y se aplica solo al escaneo de imágenes
 (`ci/scripts/trivy-run.sh images`, mediante `--ignorefile`).
 
@@ -8,12 +8,17 @@ El gate de Trivy sigue bloqueando cualquier hallazgo **CRITICAL** en las imágen
 
 El pipeline #55 de `dev` llegó a Trivy Images con Spring Boot 3.5.16 y Tomcat 10.1.62 (que ya eliminaron 9 de los 11
 hallazgos del #53). Quedaron dos hallazgos que **Trivy clasifica como CRITICAL** en
-`org.springframework:spring-webmvc 6.2.19`:
+`org.springframework:spring-webmvc 6.2.19`; el pipeline #57 añadió un tercero en `spring-webflux 6.2.19`
+(servicio `notification`), de la misma línea y con la misma corrección solo en Spring Framework 7.0.9:
 
 | CVE | Condición para explotarla | ¿Aplica a CircleGuard? |
 |:---|:---|:---|
 | CVE-2026-47884 (SSRF/RCE) | `XsltView` con un mapeo `/**` que renderiza vistas sin nombre explícito | No: ningún servicio usa `XsltView`, `ViewResolver` ni `ModelAndView`. Son APIs REST (JSON). |
 | CVE-2026-47890 (corrupción de stream SSE) | Server-Sent Events con fragmentos de vista | No: ningún servicio usa `SseEmitter` ni `text/event-stream`. |
+| CVE-2026-47892 (bypass de predicado de cabecera en preflight) | Endpoints funcionales de WebFlux (`RouterFunction`) desplegados bajo `DispatcherServlet` | No: ningún servicio define un `RouterFunction`. `notification` usa WebFlux solo para `WebClient` (push y LMS). |
+
+Los demás hallazgos sí se corrigieron subiendo versión (Tomcat 10.1.62, Netty 4.1.141 por CVE-2026-75595 y Freemarker
+2.3.35 por CVE-2026-84939, todos sobrescritos en el `build.gradle.kts` raíz) y no forman parte de esta excepción.
 
 ### Severidad
 
@@ -33,7 +38,7 @@ que no se asume.
 
 ## Controles
 
-- Solo se ignoran esas dos CVE, no una severidad ni un paquete completo.
+- Solo se ignoran esas tres CVE, no una severidad ni un paquete completo.
 - El archivo se llama `images.trivyignore` a propósito. Trivy carga `./.trivyignore` automáticamente en cualquier
   escaneo, así que con ese nombre las excepciones llegarían también a IaC y secretos. Con otro nombre solo se aplican
   donde se pasa `--ignorefile` (imágenes).

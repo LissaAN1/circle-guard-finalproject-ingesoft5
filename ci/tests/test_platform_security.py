@@ -152,9 +152,9 @@ class TrivyIgnoreContract(unittest.TestCase):
         lines = self.IGNORE.read_text(encoding='utf8').splitlines()
         return [l.strip() for l in lines if l.strip() and not l.lstrip().startswith('#')]
 
-    def test_only_the_two_documented_spring_webmvc_cves_are_ignored(self):
+    def test_only_the_three_documented_spring_cves_are_ignored(self):
         ids = sorted(e.split()[0] for e in self.entries())
-        self.assertEqual(ids, ['CVE-2026-47884', 'CVE-2026-47890'])
+        self.assertEqual(ids, ['CVE-2026-47884', 'CVE-2026-47890', 'CVE-2026-47892'])
 
     def test_every_exception_has_a_real_future_expiry_within_the_window(self):
         today = datetime.date.today()
@@ -196,6 +196,9 @@ class DependencySecurityFloors(unittest.TestCase):
 
     def test_netty_is_at_least_the_release_fixing_cve_2026_75595(self):
         self.assertGreaterEqual(self.version('netty.version'), (4, 1, 137))
+
+    def test_freemarker_is_at_least_the_release_fixing_cve_2026_84939(self):
+        self.assertGreaterEqual(self.version('freemarker.version'), (2, 3, 35))
 
 
 if __name__ == '__main__':

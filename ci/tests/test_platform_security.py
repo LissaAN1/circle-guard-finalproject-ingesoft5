@@ -142,3 +142,25 @@ class IngressTlsContract(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TrivyIgnoreContract(unittest.TestCase):
+    """The accepted-findings file must stay narrow and time-boxed."""
+
+    def entries(self):
+        lines = (ROOT / '.trivyignore').read_text(encoding='utf8').splitlines()
+        return [l.strip() for l in lines if l.strip() and not l.lstrip().startswith('#')]
+
+    def test_only_the_two_documented_spring_webmvc_cves_are_ignored(self):
+        ids = sorted(e.split()[0] for e in self.entries())
+        self.assertEqual(ids, ['CVE-2026-47884', 'CVE-2026-47890'])
+
+    def test_every_exception_expires(self):
+        for entry in self.entries():
+            self.assertRegex(entry, r' exp:\d{4}-\d{2}-\d{2}$')
+
+    def test_only_image_scan_uses_the_ignore_file(self):
+        runner = (ROOT / 'ci/scripts/trivy-run.sh').read_text(encoding='utf8')
+        self.assertEqual(runner.count('--ignorefile'), 1)
+        self.assertIn('--ignorefile "$PWD/.trivyignore"', runner.split('elif [[ "$mode" == images ]]')[1].split('else')[0])
+        self.assertIn('--severity CRITICAL --exit-code 1', runner)

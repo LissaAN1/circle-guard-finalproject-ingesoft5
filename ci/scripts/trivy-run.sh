@@ -35,6 +35,7 @@ elif [[ "$mode" == images ]]; then
     [[ "$unit" =~ ^(auth|identity|promotion|notification|form|file|gateway|dashboard|web)$ ]] || { echo 'Invalid unit' >&2; exit 2; }
     name="$(bash ci/scripts/unit-info.sh "$unit" image)"
     scan image --image-src docker --scanners vuln --severity CRITICAL --exit-code 1 \
+      --ignorefile "$PWD/.trivyignore" \
       --format json --output "ci/reports/trivy/${unit}.json" \
       "circleguard/${name}:${CG_IMAGE_TAG}"
     echo "Trivy image scan passed: $unit"

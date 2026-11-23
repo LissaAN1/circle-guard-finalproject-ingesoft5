@@ -7,10 +7,14 @@ mode="${1:-}"
 case "$mode" in iac|images|secrets) ;; *) echo 'Usage: trivy-run.sh iac|images|secrets' >&2; exit 2;; esac
 cd "$ROOT"
 image="${CG_TRIVY_IMAGE:-aquasec/trivy:0.76.2}"
-mkdir -p ci/reports/trivy ci/.trivy-cache
+mkdir -p ci/reports/trivy
+# Vulnerability and Java DBs (~1 GB) live in a named Docker volume mounted at the
+# container's world-writable /tmp, so they survive cleanWs and are downloaded
+# once instead of on every build (and never fill the workspace).
+cache_volume="${CG_TRIVY_CACHE_VOLUME:-circleguard-trivy-cache}"
 opts=(--rm --volumes-from "${CG_AGENT_CONTAINER:-circleguard-build-agent}" \
   -w "$PWD" --user "$(id -u):$(id -g)" \
-  -e HOME=/tmp -e TRIVY_CACHE_DIR="$PWD/ci/.trivy-cache")
+  -v "$cache_volume:/tmp" -e HOME=/tmp -e TRIVY_CACHE_DIR=/tmp/trivy-cache)
 scan() {
   docker run "${opts[@]}" "$image" "$@"
 }

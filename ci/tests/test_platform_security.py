@@ -201,5 +201,23 @@ class DependencySecurityFloors(unittest.TestCase):
         self.assertGreaterEqual(self.version('freemarker.version'), (2, 3, 35))
 
 
+class WebImageHardening(unittest.TestCase):
+    """The web image must patch Alpine packages and still end as an unprivileged user."""
+
+    def final_stage(self):
+        text = (ROOT / 'mobile/Dockerfile').read_text(encoding='utf8')
+        return text.split('FROM nginxinc/nginx-unprivileged')[1]
+
+    def test_alpine_packages_are_upgraded_as_root_before_dropping_privileges(self):
+        stage = self.final_stage()
+        self.assertIn('apk upgrade --no-cache', stage)
+        self.assertLess(stage.index('USER root'), stage.index('apk upgrade --no-cache'))
+        self.assertLess(stage.index('apk upgrade --no-cache'), stage.rindex('USER 101'))
+
+    def test_image_still_runs_as_the_unprivileged_user(self):
+        users = [l.split()[1] for l in self.final_stage().splitlines() if l.startswith('USER ')]
+        self.assertEqual(users[-1], '101')
+
+
 if __name__ == '__main__':
     unittest.main()

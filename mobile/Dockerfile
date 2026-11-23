@@ -17,9 +17,11 @@ LABEL org.opencontainers.image.title="circleguard-web" \
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --chmod=755 docker-entrypoint.sh /docker-entrypoint-cg.sh
-# nginx-unprivileged corre como UID 101; config.js se escribe en tiempo de arranque
+# nginx-unprivileged corre como UID 101; config.js se escribe en tiempo de arranque.
+# apk upgrade aplica los parches de Alpine publicados despues de la imagen base (OpenSSL, brotli):
+# Trivy bloquea la publicacion si quedan CVE CRITICAL en los paquetes del sistema.
 USER root
-RUN chown 101:101 /usr/share/nginx/html
+RUN apk upgrade --no-cache && chown 101:101 /usr/share/nginx/html
 USER 101
 EXPOSE 8080
 ENTRYPOINT ["/docker-entrypoint-cg.sh"]

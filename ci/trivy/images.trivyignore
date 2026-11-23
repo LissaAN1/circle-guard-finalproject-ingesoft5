@@ -9,3 +9,8 @@
 CVE-2026-47884 exp:2026-12-23
 # Needs Server-Sent Events with view fragments. No service uses SseEmitter or text/event-stream.
 CVE-2026-47890 exp:2026-12-23
+
+# spring-webflux 6.2.19 (same line, same fix only in 7.0.9 / Spring Boot 4).
+# Needs WebFlux functional endpoints (RouterFunction) deployed under DispatcherServlet. No service defines
+# any RouterFunction; notification uses WebFlux only for the WebClient (push and LMS calls).
+CVE-2026-47892 exp:2026-12-23

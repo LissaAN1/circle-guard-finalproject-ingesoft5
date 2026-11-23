@@ -21,6 +21,8 @@ subprojects {
     extra["tomcat.version"] = "10.1.62"
     // Security: the Boot 3.5.16 BOM ships Netty 4.1.135, affected by CVE-2026-75595 (CRITICAL, fixed in >= 4.1.137).
     extra["netty.version"] = "4.1.141.Final"
+    // Security: the Boot 3.5.16 BOM ships Freemarker 2.3.34, affected by CVE-2026-84939 (CRITICAL, fixed in 2.3.35).
+    extra["freemarker.version"] = "2.3.35"
     apply(plugin = "java")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "jacoco")

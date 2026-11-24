@@ -34,5 +34,27 @@ for key in DB_USER DB_PASSWORD NEO4J_PASSWORD LDAP_ADMIN_PASSWORD REDIS_PASSWORD
 done
 
 kc create namespace "$ns" --dry-run=client -o yaml | kc apply -f - >/dev/null
-kc -n "$ns" create secret generic circleguard-secrets "${args[@]}" --dry-run=client -o yaml | kc apply -f - >/dev/null
-echo "Secret circleguard-secrets applied in $ns"
+
+# Treat credentials as immutable during normal deployments. A Kubernetes Secret
+# update does not rotate passwords already persisted by PostgreSQL, Neo4j or LDAP.
+# Redis also reads the password only when its process starts.
+existing="$(kc -n "$ns" get secret circleguard-secrets --ignore-not-found -o name)"
+if [[ -z "$existing" ]]; then
+  kc -n "$ns" create secret generic circleguard-secrets "${args[@]}" >/dev/null
+  echo "Secret circleguard-secrets created in $ns"
+else
+  drift=0
+  for key in DB_USER DB_PASSWORD NEO4J_PASSWORD LDAP_ADMIN_PASSWORD REDIS_PASSWORD JWT_SECRET QR_SECRET VAULT_SECRET VAULT_SALT VAULT_HASH_SALT; do
+    # Never echo/expand secret bytes in logs or command-line arguments.
+    if ! kc -n "$ns" get secret circleguard-secrets \
+      -o "jsonpath={.data.$key}" | base64 --decode | cmp -s - "$work/$key"; then
+      echo "ERROR: existing circleguard-secrets differs from the Jenkins env file for $key" >&2
+      drift=1
+    fi
+  done
+  if [[ "$drift" -ne 0 ]]; then
+    echo "Deployment blocked. Synchronize the Jenkins file credential with the existing Secret; do not rotate persistent passwords in a regular deployment." >&2
+    exit 1
+  fi
+  echo "Secret circleguard-secrets verified unchanged in $ns"
+fi

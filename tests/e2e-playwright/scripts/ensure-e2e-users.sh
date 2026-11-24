@@ -11,6 +11,9 @@
 # - The seeded users are rejected by name, so their credentials are never modified.
 # - Passwords travel on stdin of `kubectl exec`; they are never placed in an argument or printed.
 # - The hash is computed by PostgreSQL (pgcrypto bcrypt, compatible with Spring's BCryptPasswordEncoder).
+#   The extension must already exist in circleguard_auth; this script only checks it and runs no DDL.
+# - This step proves the rows, roles and gate:scan exist. That the passwords are accepted by Spring
+#   Security is proven right after by fixture-gate-user.mjs (login, UUID, gate:scan in the JWT).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 env_name="${1:-}"
@@ -50,7 +53,12 @@ emit_sql() {
   printf '\\set sp %s\n' "$(psql_quote "$E2E_PASSWORD")"
   printf '\\set gp %s\n' "$(psql_quote "$E2E_GATE_PASSWORD")"
   cat <<'EOF_SQL'
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
+-- pgcrypto is prepared with the database (infra/k8s/base/init-db.sql); the E2E never runs DDL.
+DO $check$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') THEN
+    RAISE EXCEPTION 'pgcrypto is not installed in circleguard_auth (see infra/k8s/base/init-db.sql)';
+  END IF;
+END $check$;
 -- One statement per account. An existing row is only rewritten when Jenkins holds a different
 -- password (rotation) or the account was disabled; otherwise nothing changes.
 INSERT INTO local_users (username, password_hash, email, is_active)

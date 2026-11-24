@@ -100,6 +100,14 @@ class EnsureE2EUsersSimulationTests(unittest.TestCase):
         self.assertIn("'STUDENT'", sql)
         self.assertIn("ON CONFLICT (user_id, role_id) DO NOTHING", sql)
 
+    def test_e2e_runs_no_ddl_and_requires_pgcrypto(self):
+        self.run_script()
+        sql = self.stdin.read_text(encoding="utf-8")
+        self.assertNotIn("CREATE EXTENSION", sql)
+        self.assertIn("extname = 'pgcrypto'", sql)
+        init = (ROOT / "infra/k8s/base/init-db.sql").read_text(encoding="utf-8")
+        self.assertRegex(init, r"\\connect circleguard_auth\s+CREATE EXTENSION IF NOT EXISTS pgcrypto;")
+
     def test_only_touches_the_dedicated_accounts(self):
         sql_text = (ROOT / "tests/e2e-playwright/scripts/ensure-e2e-users.sh").read_text(encoding="utf-8")
         for seeded in ("staff_guard", "health_user", "super_admin"):

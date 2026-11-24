@@ -60,8 +60,14 @@ DOPTS=(--rm --network "container:$AGENT_CONTAINER" --volumes-from "$AGENT_CONTAI
   --user "$(id -u):$(id -g)" -e HOME=/tmp -e CI=true -e E2E_BASE_URL
   -e E2E_USERNAME -e E2E_PASSWORD -e E2E_GATE_USERNAME -e E2E_GATE_PASSWORD
   -w "$ROOT/tests/e2e-playwright")
-# DEV login is resolved by the local database only (LDAP has no entries), so the dedicated accounts are ensured first.
-[[ "$env_name" != dev ]] || bash "$ROOT/tests/e2e-playwright/scripts/ensure-e2e-users.sh" dev
+# Ensure DEV fixtures before running Playwright.
+if [[ "$env_name" == dev ]]; then
+  bash "$ROOT/tests/e2e-playwright/scripts/ensure-e2e-users.sh" dev
+
+  docker run "${DOPTS[@]}" "$IMAGE" \
+    node scripts/ensure-e2e-questionnaire.mjs
+fi
+
 gate_uuid="$(docker run "${DOPTS[@]}" "$IMAGE" node scripts/fixture-gate-user.mjs)"
 [[ "$gate_uuid" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo 'Invalid E2E fixture UUID' >&2; exit 1; }
 previous_status="$(redis_cmd GET "$gate_uuid" | tr -d '\r')"

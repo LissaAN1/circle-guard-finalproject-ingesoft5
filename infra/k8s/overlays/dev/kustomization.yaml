@@ -92,3 +92,14 @@ patches:
         value:
           - hosts: [dev.circleguard.test]
             secretName: circleguard-ingress-tls
+  # Temporary DEV mitigation: the LDAP Actuator health indicator returns 503
+  # even though the administrative LDAP bind succeeds.
+  # Keep LDAP authentication enabled; disable only this health indicator.
+  # Remove after the underlying LDAP health-check issue is fixed.
+  - target: {kind: Deployment, name: auth}
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: MANAGEMENT_HEALTH_LDAP_ENABLED
+          value: "false"

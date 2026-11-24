@@ -23,7 +23,7 @@ rules:
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: ["get"]
-  # Tests interact only with the Redis fixture and the local web tunnel.
+  # Tests interact with the Redis fixture, the DEV auth accounts (ensure-e2e-users.sh) and the local web tunnel.
   - apiGroups: [""]
     resources: ["pods/exec", "pods/portforward"]
     verbs: ["create"]

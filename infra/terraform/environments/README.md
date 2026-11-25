@@ -1,6 +1,6 @@
 # Ambientes `dev`, `stage` y `prod`
 
-Cada carpeta es una configuración raíz independiente que arma el ambiente completo con los cinco módulos de [`../modules`](../README.md): red, clúster k3s, repositorios ECR, bucket de artefactos y observabilidad (logs y alarmas). Cada ambiente guarda su estado en el backend remoto que crea [`../bootstrap`](../bootstrap/README.md), con su propia llave, de modo que los estados no se mezclan.
+Cada carpeta es una configuración raíz independiente que arma el ambiente completo con los módulos de [`../modules`](../README.md): red, clúster k3s, repositorios ECR, bucket de artefactos y observabilidad (logs y alarmas) de TEC-09, más `cicd_link` (peering con la red de Jenkins y Nexus, HU-13) y `finops` (presupuesto y escala a cero, HU-25). Cada ambiente guarda su estado en el backend remoto que crea [`../bootstrap`](../bootstrap/README.md), con su propia llave, de modo que los estados no se mezclan.
 
 | | `dev` | `stage` | `prod` |
 |:---|:---|:---|:---|
@@ -10,6 +10,8 @@ Cada carpeta es una configuración raíz independiente que arma el ambiente comp
 | Retención de logs | 7 días | 30 días | 90 días |
 | Borrado forzado de repositorios y bucket | sí | no | no |
 | Llave del estado | `dev/terraform.tfstate` | `stage/terraform.tfstate` | `prod/terraform.tfstate` |
+| Presupuesto mensual (`finops`) | 40 USD | 40 USD | 80 USD |
+| Escala a cero disponible | sí (`scale_to_zero_enabled`) | sí | no (el módulo lo rechaza) |
 
 Los rangos de red no se solapan, así que los ambientes se pueden conectar entre sí más adelante si hace falta. Las diferencias de tamaño están en los valores por defecto de `variables.tf` de cada ambiente; el resto del código es el mismo.
 
@@ -44,13 +46,33 @@ Aplicar crea recursos con costo en AWS (instancias EC2, volúmenes).
 
 ## Estado de la validación
 
-En este avance, los ambientes se entregan definidos y validados mediante pruebas con proveedores simulados (`fmt`, `validate` y `terraform test`); **no se aplicó ninguno en AWS**. Su aplicación y verificación real en AWS se realizarán posteriormente, de acuerdo con HU-10 y HU-11, antes del cierre de la Parte 2: la Parte 2 exige los tres ambientes, así que `stage` y `prod` también hay que desplegarlos y verificarlos, no solo `dev`.
+**Estado vigente (22 de noviembre de 2026).** Los tres ambientes están aplicados en AWS y `terraform plan
+-detailed-exitcode` devuelve `0` en dev, stage y prod (sin cambios pendientes). Ese resultado indica que la
+configuración, el estado remoto y la infraestructura coinciden; la salud de las aplicaciones se comprueba aparte con
+`kubectl`. Inventario: [`hu-10-inventario-aws.md`](../../../docs/operaciones/hu-10-inventario-aws.md).
+
+*Nota original del primer avance de HU-10, conservada como antecedente:* En este avance, los ambientes se entregan definidos y validados mediante pruebas con proveedores simulados (`fmt`, `validate` y `terraform test`); **no se aplicó ninguno en AWS**. Su aplicación y verificación real en AWS se realizarán posteriormente, de acuerdo con HU-10 y HU-11, antes del cierre de la Parte 2: la Parte 2 exige los tres ambientes, así que `stage` y `prod` también hay que desplegarlos y verificarlos, no solo `dev`.
 
 ## Registro de imágenes: Nexus y ECR
 
+**Decisión tomada:** el pipeline y los nodos usan **Nexus** (`<ip-privada-nexus>:8082`), al que los nodos llegan por el
+peering. Cada nodo recibe `/etc/rancher/k3s/registries.yaml` al crearse, con la cuenta de solo lectura `cg-reader` y la
+contraseña leída del parámetro SSM SecureString indicado en `registry_password_parameter`. Los repositorios ECR siguen
+aprovisionados y vacíos. El texto siguiente es el análisis original que llevó a esa decisión.
+
 **Nexus sigue siendo el registro principal de imágenes**: es el que usa Jenkins hoy, y **HU-13 seguirá usando Nexus mientras el equipo no acuerde una migración**. Cada ambiente aprovisiona un repositorio ECR por servicio (8 por ambiente, 24 en total al aplicar los tres) únicamente como parte del aprovisionamiento de TEC-09: son la pieza reutilizable de registro y **ningún pipeline publica en ECR todavía**, de modo que no hay dos fuentes de imágenes en uso. Si el equipo decide no usarlos, basta con quitar la llamada al módulo `registry` (y su salida y su prueba) de cada ambiente; ningún otro módulo depende de él. Si el equipo decide usar ECR más adelante, antes hay que acordar la promoción entre ambientes y la autenticación de Jenkins y de los nodos k3s; ambos puntos están descritos en el [README del módulo `registry`](../modules/registry/README.md#propósito-y-relación-con-nexus). Esta decisión queda por confirmar en el equipo antes de HU-13.
 
-## Acceso de Jenkins a la API de Kubernetes (propuesta para HU-13)
+## Acceso de Jenkins a la API de Kubernetes
+
+**Implementado (HU-13): opción 4, conectividad privada.** El módulo `cicd_link` crea el VPC peering de cada ambiente con
+la VPC de CI/CD, las rutas en ambos sentidos, la regla que abre `tcp/6443` solo a la IP privada de Jenkins (`/32`) y la
+regla del security group de Nexus que admite `tcp/8082` desde el rango del ambiente. La API de K3s no se abre a
+Internet para Jenkins y la IP pública cambiante de los nodos deja de importar. Para no romper las pruebas con proveedores
+simulados, el módulo solo se crea si se definen todas sus variables (`cicd_vpc_id`, `cicd_vpc_cidr`,
+`cicd_route_table_ids`, `jenkins_private_ip`, `nexus_security_group_id`). El texto siguiente es la propuesta original
+y se conserva como antecedente de la decisión.
+
+*Propuesta original para HU-13:*
 
 Cada ambiente tiene su propia VPC (`10.0.0.0/16`, `10.1.0.0/16`, `10.2.0.0/16`), distinta de la red donde corre Jenkins, así que Jenkins no llega a la API de k3s (puerto 6443) por red privada: tener rangos distintos no conecta las VPC entre sí. Hay dos caminos razonables: acceder a cada API por su dirección pública restringida al origen de Jenkins, o establecer conectividad privada entre Jenkins y las VPC (mejor aislamiento, pero con infraestructura adicional). Este PR no implementa la integración, que corresponde también a HU-11 y HU-13; propone el mecanismo para acordarlo y no rediseñar después el despliegue desde Jenkins:
 

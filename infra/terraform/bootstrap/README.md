@@ -39,6 +39,14 @@ terraform import 'aws_dynamodb_table.lock' <lock_table_name>
 
 Si se borra el bucket entero, los estados de los ambientes se pierden con él: por eso el bucket está versionado y la política del módulo `storage` no permite `force_destroy` fuera de `dev`.
 
+## Estado actual
+
+El bootstrap se aplicó el 18 de noviembre de 2026 en la cuenta del proyecto (us-east-1). Verificado en la consola y con
+la CLI: bucket `circleguard-tfstate-<id de cuenta>` con control de versiones habilitado y cifrado SSE-S3; tabla
+`circleguard-tfstate-lock` con llave `LockID`, modo bajo demanda y protección contra eliminación activa. Los objetos
+`dev/`, `stage/` y `prod/terraform.tfstate` contienen el estado de los ambientes. Jenkins recibe la configuración del
+backend como credencial `tf-backend-<env>` (archivo `backend.hcl`), nunca desde el repositorio.
+
 ## Variables
 
 | Nombre | Tipo | Por defecto | Descripción |

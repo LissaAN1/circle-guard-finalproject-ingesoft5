@@ -16,6 +16,12 @@ infra/k8s/
   secrets.sh       crea el Secret circleguard-secrets de un ambiente
   deploy.sh        aplica un ambiente con el registro y la versión indicados
   validate.py      verificación sin clúster de los tres ambientes
+  base/jaeger.yaml Jaeger all-in-one (UI 16686, OTLP 4318) desplegado con la aplicación (HU-19)
+  observability/   Prometheus, Alertmanager, Loki, Promtail y Grafana; los aplica observability.sh (HU-17, HU-18)
+  observability.sh despliega la pila de observabilidad en el namespace del ambiente
+  rbac/            ServiceAccounts jenkins-deployer y jenkins-e2e y emisión de kubeconfig de vida corta (HU-20)
+  tls/             emisión con CA privada y carga del Secret circleguard-ingress-tls (HU-20)
+  rollback.sh      rollout undo de un Deployment con el clúster verificado (HU-22)
 ```
 
 ## Namespaces, ConfigMaps y Secrets
@@ -73,7 +79,7 @@ Los scripts nunca usan el contexto actual de `kubectl`. Actúan sobre `KUBE_CONT
 | `/` | `web:80` | Cliente web. |
 | `/gateway` | `gateway:8087` | Un `Middleware` de Traefik (`strip-gateway`) quita el prefijo `/gateway` antes de llegar al servicio. Su anotación lleva el namespace del ambiente (`circleguard-<ambiente>-strip-gateway@kubernetescrd`), que cada overlay fija. |
 
-Ambos Ingress utilizan `websecure` (443), con los hosts estables `dev.circleguard.test`, `stage.circleguard.test` y `prod.circleguard.test` y un Secret `circleguard-ingress-tls` por namespace. Los certificados son emitidos por una CA privada (no pública) y se verifican con `openssl verify` y `curl --cacert`/`--resolve`; no se requiere DNS externo. Las claves y la CA privada permanecen fuera de Git, bajo `infra/k8s/tls/.private/`. El procedimiento está en `docs/operaciones/seguridad-plataforma.md`. El certificado no será confiable automáticamente para navegadores externos hasta instalar su CA en el almacén de confianza o adoptar un dominio con CA pública.
+Ambos Ingress utilizan `websecure` (443), con los hosts estables `dev.circleguard.test`, `stage.circleguard.test` y `prod.circleguard.test` y un Secret `circleguard-ingress-tls` por namespace. Los certificados son emitidos por una CA privada (no pública) y se verifican con `openssl verify` y `curl --cacert`/`--resolve`; no se requiere DNS externo. Las claves y la CA privada permanecen fuera de Git, bajo `infra/k8s/tls/.private/`. El procedimiento está en [`docs/operaciones/hu-20-seguridad-plataforma.md`](../../docs/operaciones/hu-20-seguridad-plataforma.md). El certificado no será confiable automáticamente para navegadores externos hasta instalar su CA en el almacén de confianza o adoptar un dominio con CA pública.
 
 **HPA.** Cada uno de los 8 servicios y `web` tiene un `HorizontalPodAutoscaler` (`autoscaling/v2`) por CPU, con objetivo del 70 % de la solicitud de CPU (`requests.cpu` de cada Deployment). Los Deployment ya no fijan `replicas`: el HPA manda, y así un nuevo `apply` no lo pisa. Sube sin espera (hasta 2 pods cada 30 s) y baja tras 180 s de calma. Requiere metrics-server, que k3s incluye.
 
@@ -94,7 +100,17 @@ python infra/k8s/validate.py
 
 Renderiza los tres overlays con `kubectl kustomize` y revisa los scripts. Comprueba: namespace correcto, cada servicio y cada pieza de middleware con su `Service`, puertos, las tres sondas (en Actuator para los servicios), límites y solicitud de CPU, un HPA por CPU por servicio con los límites del ambiente y sin `replicas` fijas, los Ingress de `/` (web) y `/gateway` con su Middleware, que los secretos se lean solo de `circleguard-secrets` que no haya un `Secret` ni valores sensibles en claro, que `deploy.sh` espere a cada workload por nombre y que los scripts fijen el clúster y no pasen secretos como argumentos.
 
-**Alcance de esta entrega:** los manifiestos están definidos y validados de forma estática; el comportamiento real del Ingress y del escalado (PI-117) se comprueba en un k3s desplegado, abajo se indica cómo. **No se han aplicado todavía en un clúster k3s real**: la verificación de que los pods quedan `Running` y se comunican (PI-114) se hará al desplegar los ambientes en AWS, junto con la verificación real de HU-10. Quedan por acordar con el equipo: el registro de imágenes (Nexus), y cómo llega Jenkins a la API de cada clúster (ver `infra/terraform/environments/README.md`).
+**Estado al cierre de la Parte 2 (22 de noviembre de 2026).** Los manifiestos se aplicaron en los tres clústeres K3s
+creados con Terraform: 15 workloads listos por ambiente (6 StatefulSet y 9 Deployment) con la versión común
+`1.0.0-ci.37.16dffba` desde Nexus, Ingress de Traefik con TLS, 9 HPA con métricas reales y escalado verificado en dev
+(gateway de 1 a 2 réplicas y de vuelta a 1). Detalle y hallazgos del despliegue real (PR #61 y #62):
+[`docs/operaciones/hu-10-inventario-aws.md`](../../docs/operaciones/hu-10-inventario-aws.md). En dev, además, el
+overlay inyecta Linkerd en los Deployment (HU-23) y el namespace admite experimentos de Chaos Mesh (HU-24).
+
+Diferencias respecto del texto original de HU-12: dashboard, file y notification no incluyen Actuator, así que sus tres
+sondas son de puerto TCP hasta que se agregue la dependencia; los demás servicios usan `/actuator/health`.
+
+*Nota original de HU-11 y HU-12, conservada como antecedente:* **Alcance de esta entrega:** los manifiestos están definidos y validados de forma estática; el comportamiento real del Ingress y del escalado (PI-117) se comprueba en un k3s desplegado, abajo se indica cómo. **No se han aplicado todavía en un clúster k3s real**: la verificación de que los pods quedan `Running` y se comunican (PI-114) se hará al desplegar los ambientes en AWS, junto con la verificación real de HU-10. Quedan por acordar con el equipo: el registro de imágenes (Nexus), y cómo llega Jenkins a la API de cada clúster (ver `infra/terraform/environments/README.md`).
 
 ## Verificar el escalado en un clúster (PI-117)
 
@@ -107,4 +123,4 @@ kubectl --context circleguard-dev -n circleguard-dev run carga --rm -it --image=
 kubectl --context circleguard-dev -n circleguard-dev get hpa gateway -w          # las réplicas suben y, al parar la carga, bajan tras ~3 min
 ```
 
-Esta verificación requiere el despliegue real en AWS y queda pendiente igual que PI-114.
+Esta verificación requería el despliegue real en AWS. Se ejecutó en dev: con carga, el HPA del gateway llegó a 210 % de CPU sobre el objetivo de 70 %, creó una segunda réplica y volvió a una tras unos 3 minutos sin carga (eventos `SuccessfulRescale`).

@@ -51,8 +51,9 @@ recursos regionales que el ambiente crea junto al clúster.
 
 ## 2. Módulos y ambientes
 
-Cada ambiente es una configuración raíz que llama a los mismos cinco módulos.
-Las flechas de un módulo a otro son datos que pasa el ambiente.
+Cada ambiente es una configuración raíz que llama a los mismos cinco módulos de
+TEC-09. Las flechas de un módulo a otro son datos que pasa el ambiente. Después se
+agregaron `cicd_link` y `finops`, que se dibujan en las secciones 5 y 6.
 
 ```mermaid
 flowchart LR
@@ -165,8 +166,71 @@ flowchart LR
     end
 ```
 
+## 5. Conectividad privada con la plataforma CI/CD (módulo `cicd_link`, HU-13)
+
+Jenkins, SonarQube y Nexus siguen en la VPC por defecto de la Parte 1 (`172.31.0.0/16`), creada con scripts Bash.
+Cada ambiente se conecta con ella por un VPC peering propio; los ambientes no se conectan entre sí.
+
+```mermaid
+flowchart LR
+    subgraph cicd["VPC CI/CD 172.31.0.0/16 (Parte 1)"]
+        jenkins["Jenkins 172.31.4.239<br/>+ agente de build"]
+        nexus["Nexus 172.31.5.84<br/>registro :8082"]
+        sonar["SonarQube 172.31.6.46"]
+    end
+    subgraph dev["dev 10.0.0.0/16"]
+        devs["servidor K3s"]
+    end
+    subgraph stage["stage 10.1.0.0/16"]
+        stgs["servidor + 1 agente"]
+    end
+    subgraph prod["prod 10.2.0.0/16"]
+        prds["servidor + 2 agentes"]
+    end
+    jenkins -->|"tcp/6443 solo desde la IP de Jenkins /32"| devs
+    jenkins -->|"tcp/6443"| stgs
+    jenkins -->|"tcp/6443"| prds
+    devs -->|"tcp/8082 pull de imágenes"| nexus
+    stgs -->|"tcp/8082"| nexus
+    prds -->|"tcp/8082"| nexus
+    jenkins --- sonar
+```
+
+| Recurso de `cicd_link` | Para qué |
+|:---|:---|
+| `aws_vpc_peering_connection` | Peering entre la VPC del ambiente y la de CI/CD (aceptado automáticamente, misma cuenta). |
+| `aws_route` en ambos sentidos | El ambiente llega a `172.31.0.0/16` y las tablas de CI/CD llegan al rango del ambiente. |
+| Regla de entrada `jenkins_k3s_api` | `tcp/6443` en el security group del clúster solo desde la IP privada de Jenkins. |
+| Regla de entrada `nodes_nexus_pull` | `tcp/8082` en el security group de Nexus desde el rango del ambiente. |
+
+La tabla de rutas del módulo `network` ignora cambios en `route` (`lifecycle.ignore_changes`) para que un `plan` no
+borre las rutas que agrega `cicd_link`; ese fue uno de los hallazgos del despliegue real (PR #61).
+
+Reglas de salida del security group del clúster: tráfico entre nodos (`intra_cluster`), `tcp/8082` hacia la VPC de
+CI/CD (`nexus`) y una salida general a `0.0.0.0/0` que se mantiene como excepción documentada de Trivy (`AWS-0104`)
+porque K3s la necesita para instalarse y descargar imágenes públicas.
+
+## 6. FinOps (módulo `finops`, HU-25)
+
+```mermaid
+flowchart LR
+    tag["Etiqueta Environment<br/>(default_tags)"] --> budget["AWS Budgets<br/>presupuesto mensual del ambiente"]
+    budget -->|"50 %, 80 %, 100 % real y 100 % pronosticado"| mail["Correo de alarm_email"]
+    sched["EventBridge Scheduler<br/>20:00 stop / 07:00 start L-V"] -->|"rol IAM: solo start/stop de sus nodos"| nodes["Nodos K3s de dev o stage"]
+```
+
+El horario solo se crea con `scale_to_zero_enabled = true` y el módulo lo rechaza en prod.
+
+## 7. Estado de lo desplegado
+
+Los diagramas 1 a 6 coinciden con lo aplicado en AWS al 22 de noviembre de 2026: 6 nodos `m7i-flex.large`, 3 VPC con
+dos subredes públicas cada una, 3 peering activos, 24 repositorios ECR, buckets de artefactos y del estado, tabla de
+bloqueo y parámetros SSM del token de cada clúster. `terraform plan -detailed-exitcode` devolvió `0` en los tres
+ambientes ([`hu-10-inventario-aws.md`](../../docs/operaciones/hu-10-inventario-aws.md)).
+
 ## Referencias
 
 - Módulos: [`infra/terraform/modules`](../terraform/modules)
 - Backend remoto: [`infra/terraform/bootstrap`](../terraform/bootstrap/README.md)
-- Ambientes: `infra/terraform/environments`
+- Ambientes: [`infra/terraform/environments`](../terraform/environments/README.md)
+- Inventario real: [`docs/operaciones/hu-10-inventario-aws.md`](../../docs/operaciones/hu-10-inventario-aws.md)

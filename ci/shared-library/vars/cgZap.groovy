@@ -5,7 +5,7 @@ def call(Map cfg = [:]) {
     if (!(target in ['dev', 'stage'])) {
         error('cgZap: environment must be dev or stage')
     }
-    withCredentials([file(credentialsId: "kubeconfig-${target}", variable: 'KUBECONFIG')]) {
+    withCredentials([file(credentialsId: "kubeconfig-e2e-${target}", variable: 'KUBECONFIG')]) {
         int rc = sh(script: "bash ci/scripts/zap-run.sh ${target}", returnStatus: true)
         archiveArtifacts artifacts: 'ci/reports/zap/**', allowEmptyArchive: true, fingerprint: false
         if (fileExists('ci/reports/zap/zap-report.html')) {

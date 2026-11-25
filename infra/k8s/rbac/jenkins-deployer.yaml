@@ -1,0 +1,74 @@
+# Apply this file once as a cluster administrator in each environment.
+# The namespace placeholder must be replaced before applying.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: jenkins-deployer
+  namespace: NAMESPACE
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: jenkins-deployer
+  namespace: NAMESPACE
+rules:
+  # Deploys and rollouts do not require shell access to application pods.
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  # The administrator creates this Secret once. Jenkins can refresh only that one.
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["circleguard-secrets"]
+    verbs: ["get", "update", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+  - apiGroups: ["traefik.io"]
+    resources: ["middlewares"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: jenkins-deployer
+  namespace: NAMESPACE
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: NAMESPACE
+roleRef:
+  kind: Role
+  name: jenkins-deployer
+  apiGroup: rbac.authorization.k8s.io
+---
+# Namespaces are cluster-scoped. The role may update ONLY its own pre-created
+# namespace, allowing `kubectl apply -k` to process the Namespace object.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: NAMESPACE-jenkins-namespace
+rules:
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    resourceNames: ["NAMESPACE"]
+    verbs: ["get", "patch", "update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: NAMESPACE-jenkins-namespace
+subjects:
+  - kind: ServiceAccount
+    name: jenkins-deployer
+    namespace: NAMESPACE
+roleRef:
+  kind: ClusterRole
+  name: NAMESPACE-jenkins-namespace
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,67 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification
+  labels:
+    app.kubernetes.io/name: notification
+    app.kubernetes.io/part-of: circleguard
+spec:
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      containers:
+        - name: notification
+          image: circleguard-notification-service
+          ports:
+            - name: http
+              containerPort: 8082
+          env:
+            - { name: SPRING_KAFKA_BOOTSTRAP_SERVERS, value: "kafka:9092" }
+            - { name: SPRING_MAIL_HOST, value: "localhost" }
+            - { name: AUTH_API_URL, value: "http://auth:8180" }
+            - {
+                name: OTEL_EXPORTER_OTLP_ENDPOINT,
+                value: "http://jaeger:4318/v1/traces",
+              }
+          # This service does not include Spring Boot Actuator yet, so /actuator/health
+          # does not exist; the probes check that the port accepts connections.
+          startupProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            tcpSocket: { port: http }
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: { cpu: 100m, memory: 256Mi }
+            limits: { cpu: "1", memory: 768Mi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification
+  labels:
+    app.kubernetes.io/name: notification
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: notification
+  ports:
+    - name: http
+      port: 8082
+      targetPort: http

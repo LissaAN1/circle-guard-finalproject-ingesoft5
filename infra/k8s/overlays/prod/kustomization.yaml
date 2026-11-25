@@ -1,0 +1,64 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: circleguard-prod
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+# Registry and version are set by deploy.sh at deploy time, never committed.
+configMapGenerator:
+  - name: circleguard-config
+    behavior: merge
+    literals:
+      - APP_CORS_ALLOWED_ORIGINS=http://localhost:8080
+      # HU-15: feature toggle of the gateway. true = SUSPECT/PROBABLE users are denied entry.
+      # Change it here (or with kubectl edit) and restart the gateway: no new image is needed.
+      - FEATURE_DENY_SUSPECT_ENTRY=true
+    options:
+      disableNameSuffixHash: true
+
+patches:
+  # Autoscaling bounds of the prod environment for every HPA.
+  - target: {kind: HorizontalPodAutoscaler}
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 2
+      - op: replace
+        path: /spec/maxReplicas
+        value: 5
+  # The Traefik middleware annotation needs the namespace of the environment.
+  - target: {kind: Ingress, name: circleguard-gateway}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.middlewares
+        value: circleguard-prod-strip-gateway@kubernetescrd
+  # Both publicly reachable routes require a hostname and the same TLS Secret.
+  - target: {kind: Ingress, name: circleguard-web}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
+        value: websecure
+      - op: add
+        path: /spec/rules/0/host
+        value: prod.circleguard.test
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts: [prod.circleguard.test]
+            secretName: circleguard-ingress-tls
+  - target: {kind: Ingress, name: circleguard-gateway}
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/traefik.ingress.kubernetes.io~1router.entrypoints
+        value: websecure
+      - op: add
+        path: /spec/rules/0/host
+        value: prod.circleguard.test
+      - op: add
+        path: /spec/tls
+        value:
+          - hosts: [prod.circleguard.test]
+            secretName: circleguard-ingress-tls

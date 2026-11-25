@@ -15,6 +15,12 @@ def call() {
     boolean fullRelease = env.BRANCH_NAME == 'main' && !env.CHANGE_ID
     String forceAll = fullRelease ? 'true' : (env.FORCE_ALL ?: 'false')
 
+    // Kubernetes deployment references all nine images with one immutable tag.
+    // Only release branches target a cluster; pull requests remain selective.
+    if (env.CG_CD_PLATFORM == 'k8s' && !env.CHANGE_ID && env.BRANCH_NAME == 'dev') {
+        forceAll = 'true'
+    }
+
     String out = withEnv([
         "CG_BASE=${base}",
         "FORCE_ALL=${forceAll}"

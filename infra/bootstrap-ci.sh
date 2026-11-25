@@ -63,6 +63,8 @@ bootstrap_upload "$src/ci-remote.sh" "$dst/ci-remote.sh"
   [[ -z "${GITHUB_TOKEN:-}" ]]             || printf 'GITHUB_TOKEN=%s\n' "$GITHUB_TOKEN"
   [[ -z "${NEXUS_PUBLISHER_PASSWORD:-}" ]] || printf 'NEXUS_PUBLISHER_PASSWORD=%s\n' "$NEXUS_PUBLISHER_PASSWORD"
   [[ -z "${SMEE_URL:-}" ]]                 || printf 'SMEE_URL=%s\n' "$SMEE_URL"
+  [[ -z "${CG_CD_PLATFORM:-}" ]]          || printf 'CG_CD_PLATFORM=%s\n' "$CG_CD_PLATFORM"
+  [[ -z "${NOTIFY_WEBHOOK_URL:-}" ]]      || printf 'NOTIFY_WEBHOOK_URL=%s\n' "$NOTIFY_WEBHOOK_URL"
 } | bootstrap_ssh "sudo bash '$dst/ci-remote.sh'"
 
 printf '\nJenkins: http://%s:8080  (job: circleguard; node: build-agent)\n' "$BOOTSTRAP_TARGET_IP"

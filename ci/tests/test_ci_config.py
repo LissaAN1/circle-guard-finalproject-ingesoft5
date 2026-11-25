@@ -113,7 +113,7 @@ class SharedLibraryTests(unittest.TestCase):
     def test_braces_are_balanced(self):
         for f in VARS.glob("*.groovy"):
             with self.subTest(var=f.name):
-                text = re.sub(r"//.*", "", f.read_text(encoding="utf8"))
+                text = re.sub(r"(?m)^[ \t]*//.*$", "", f.read_text(encoding="utf8"))
                 self.assertEqual(text.count("{"), text.count("}"))
                 self.assertEqual(text.count("("), text.count(")"))
 

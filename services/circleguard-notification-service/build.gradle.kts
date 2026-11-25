@@ -6,8 +6,8 @@ plugins {
 }
 
 dependencies {
-    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
-    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
+    implementation(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
+    testImplementation(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
 
     implementation("org.springframework.boot:spring-boot-starter-web")
     implementation("org.springframework.kafka:spring-kafka")
@@ -20,4 +20,6 @@ dependencies {
     compileOnly("org.projectlombok:lombok")
     annotationProcessor("org.projectlombok:lombok")
     testImplementation("org.springframework.boot:spring-boot-starter-test")
+    implementation("io.micrometer:micrometer-tracing-bridge-otel")
+    implementation("io.opentelemetry:opentelemetry-exporter-otlp")
 }

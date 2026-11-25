@@ -1,9 +1,11 @@
 package com.circleguard.promotion.service;
 
-import com.circleguard.promotion.exception.FenceException;
-import com.circleguard.promotion.repository.graph.UserNodeRepository;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.neo4j.core.Neo4jClient;
@@ -11,18 +13,29 @@ import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.util.*;
+
+import com.circleguard.promotion.exception.FenceException;
+import com.circleguard.promotion.metrics.PromotionMetrics;
+import com.circleguard.promotion.repository.graph.UserNodeRepository;
+
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class HealthStatusService {
+
     private final UserNodeRepository userNodeRepository;
     private final Neo4jClient neo4jClient;
     private final StringRedisTemplate redisTemplate;
     private final KafkaTemplate<String, Object> kafkaTemplate;
     private final com.circleguard.promotion.repository.jpa.SystemSettingsRepository systemSettingsRepository;
     private final com.circleguard.promotion.repository.graph.CircleNodeRepository circleNodeRepository;
+
+    // Opcional: si no hay registro de metricas (p. ej. pruebas unitarias manuales) el flujo de negocio no cambia.
+    @Autowired(required = false)
+    private PromotionMetrics metrics;
 
     private static final String STATUS_KEY_PREFIX = "user:status:";
     private static final String TOPIC_STATUS_CHANGED = "promotion.status.changed";
@@ -38,12 +51,25 @@ public class HealthStatusService {
     @Transactional("neo4jTransactionManager")
     @CacheEvict(cacheNames = "userStatus", allEntries = true)
     public void updateStatus(String anonymousId, String status, boolean adminOverride) {
+        long startNanos = System.nanoTime();
+        boolean success = false;
+        try {
+            applyStatusUpdate(anonymousId, status, adminOverride);
+            success = true;
+        } finally {
+            if (metrics != null) {
+                metrics.recordContainment(System.nanoTime() - startNanos, success);
+            }
+        }
+    }
+
+    private void applyStatusUpdate(String anonymousId, String status, boolean adminOverride) {
         log.info("Updating status: {} -> {} (Admin Override: {})", anonymousId, status, adminOverride);
 
         if ("ACTIVE".equals(status) && !adminOverride) {
             checkFenceWindow(anonymousId);
         }
-        
+
         var settings = systemSettingsRepository.getSettings()
                 .orElse(com.circleguard.promotion.model.jpa.SystemSettings.builder()
                         .encounterWindowDays(14)
@@ -51,11 +77,12 @@ public class HealthStatusService {
                         .unconfirmedFencingEnabled(true)
                         .autoThresholdSeconds(3600L)
                         .build());
-        
-        long threshold = System.currentTimeMillis() - ((long)settings.getEncounterWindowDays() * 24 * 60 * 60 * 1000);
+
+        long threshold = System.currentTimeMillis()
+                - ((long) settings.getEncounterWindowDays() * 24 * 60 * 60 * 1000);
 
         // Robust Multi-Tier High-Confidence Propagation Cypher - Augmented with isValid checks and timing
-        String unifiedQuery = 
+        String unifiedQuery =
             "MATCH (source:User {anonymousId: $id}) " +
             "SET source.status = $status, source.statusUpdatedAt = timestamp() " +
             "WITH source " +
@@ -93,53 +120,71 @@ public class HealthStatusService {
                 .bind(threshold).to("threshold")
                 .fetch().one();
 
-        // La consulta no devuelve fila cuando el usuario no tiene contactos que cambiar,
-            // aunque el nodo exista y ya haya sido actualizado: se verifica por separado.
-            boolean sourceExists = result.isPresent() || userNodeRepository.existsById(anonymousId);
-            if (sourceExists) {
-            Map<String, String> cacheUpdates = new HashMap<>();
-            cacheUpdates.put(STATUS_KEY_PREFIX + anonymousId, status);
-            
-            @SuppressWarnings("unchecked")
-            List<Map<String, String>> affected = result
-                        .map(r -> (List<Map<String, String>>) r.get("affectedContacts"))
-                        .orElse(null);
-            if (affected != null) {
-                affected.forEach(m -> {
-                    if (m != null && m.get("id") != null) {
-                        cacheUpdates.put(STATUS_KEY_PREFIX + m.get("id"), m.get("status"));
-                    }
-                });
-            }
+        // Neo4j may return no row when no contacts change, even if the source exists.
+        boolean sourceExists = result.isPresent() || userNodeRepository.existsById(anonymousId);
+        if (!sourceExists) {
+            return;
+        }
 
-            log.info("Batch updating {} Redis entries based on consolidated propagation", cacheUpdates.size());
-            updateRedisInBatches(cacheUpdates);
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> affected = result
+                .map(r -> (List<Map<String, String>>) r.get("affectedContacts"))
+                .orElse(null);
 
-            // Broadcast change
-            Map<String, Object> payload = new HashMap<>();
-            payload.put("anonymousId", anonymousId);
-            payload.put("status", status);
-            payload.put("timestamp", System.currentTimeMillis());
+        updateStatusCache(anonymousId, status, affected);
+        broadcastStatusChange(anonymousId, status);
 
-            kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
+        if (metrics != null) {
+            metrics.recordPromotion(status);
+        }
 
-            // Story 5.4: Automated Room Reservation Cancellation
-            checkAndBroadcastFencedCircles(anonymousId);
+        // Story 5.4: Automated Room Reservation Cancellation
+        checkAndBroadcastFencedCircles(anonymousId);
 
-            // Story 5.5: Administrative Alerting for Priority Roles
-            int affectedCount = (affected != null) ? affected.size() : 0;
-            if ("CONFIRMED".equals(status) || affectedCount > 20) {
-                log.info("Priority Alert triggered. Status: {}, Affected Count: {}", status, affectedCount);
-                Map<String, Object> priorityPayload = new HashMap<>();
-                priorityPayload.put("anonymousId", anonymousId);
-                priorityPayload.put("status", status);
-                priorityPayload.put("affectedCount", affectedCount);
-                priorityPayload.put("timestamp", System.currentTimeMillis());
-                priorityPayload.put("eventType", "CONFIRMED".equals(status) ? "CONFIRMED_CASE" : "LARGE_OUTBREAK");
-                
-                kafkaTemplate.send("alert.priority", anonymousId, priorityPayload);
+        // Story 5.5: Administrative Alerting for Priority Roles
+        sendPriorityAlertIfNeeded(anonymousId, status, affected);
+    }
+
+    private void updateStatusCache(String anonymousId, String status,
+            List<Map<String, String>> affected) {
+        Map<String, String> cacheUpdates = new HashMap<>();
+        cacheUpdates.put(STATUS_KEY_PREFIX + anonymousId, status);
+
+        if (affected != null) {
+            for (Map<String, String> contact : affected) {
+                if (contact != null && contact.get("id") != null) {
+                    cacheUpdates.put(STATUS_KEY_PREFIX + contact.get("id"), contact.get("status"));
+                }
             }
         }
+
+        log.info("Batch updating {} Redis entries based on consolidated propagation", cacheUpdates.size());
+        updateRedisInBatches(cacheUpdates);
+    }
+
+    private void broadcastStatusChange(String anonymousId, String status) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("anonymousId", anonymousId);
+        payload.put("status", status);
+        payload.put("timestamp", System.currentTimeMillis());
+        kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
+    }
+
+    private void sendPriorityAlertIfNeeded(String anonymousId, String status,
+            List<Map<String, String>> affected) {
+        int affectedCount = affected != null ? affected.size() : 0;
+        if (!"CONFIRMED".equals(status) && affectedCount <= 20) {
+            return;
+        }
+
+        log.info("Priority Alert triggered. Status: {}, Affected Count: {}", status, affectedCount);
+        Map<String, Object> priorityPayload = new HashMap<>();
+        priorityPayload.put("anonymousId", anonymousId);
+        priorityPayload.put("status", status);
+        priorityPayload.put("affectedCount", affectedCount);
+        priorityPayload.put("timestamp", System.currentTimeMillis());
+        priorityPayload.put("eventType", "CONFIRMED".equals(status) ? "CONFIRMED_CASE" : "LARGE_OUTBREAK");
+        kafkaTemplate.send("alert.priority", anonymousId, priorityPayload);
     }
 
     private void checkAndBroadcastFencedCircles(String anonymousId) {
@@ -151,7 +196,6 @@ public class HealthStatusService {
             circlePayload.put("locationId", circle.getLocationId());
             circlePayload.put("name", circle.getName());
             circlePayload.put("timestamp", System.currentTimeMillis());
-            
             kafkaTemplate.send("circle.fenced", circle.getId().toString(), circlePayload);
         }
     }
@@ -191,7 +235,6 @@ public class HealthStatusService {
     @Transactional("neo4jTransactionManager")
     public void resolveStatus(String anonymousId, boolean adminOverride) {
         log.info("Resolving status for user: {} (Admin Override: {})", anonymousId, adminOverride);
-
         if (!adminOverride) {
             checkFenceWindow(anonymousId);
         }
@@ -203,7 +246,7 @@ public class HealthStatusService {
 
         // 2. Refined Two-Hop Pulse Recovery
         // Phase 1: Release direct SUSPECT neighbors that have no other CONFIRMED paths
-        String phase1Query = 
+        String phase1Query =
             "MATCH (source:User {anonymousId: $id}) " +
             "OPTIONAL MATCH (source)-[:ENCOUNTERED|MEMBER_OF]-(target:User) " +
             "WHERE target.status = 'SUSPECT' " +
@@ -226,7 +269,7 @@ public class HealthStatusService {
         }
 
         // Phase 2: Release L2 PROBABLE neighbors that have no other risk paths (CONFIRMED or remaining SUSPECT)
-        String phase2Query = 
+        String phase2Query =
             "MATCH (l1:User) WHERE l1.anonymousId IN $l1Ids " +
             "OPTIONAL MATCH (l1)-[:ENCOUNTERED|MEMBER_OF]-(target:User) " +
             "WHERE target.status = 'PROBABLE' " +
@@ -269,7 +312,6 @@ public class HealthStatusService {
         payload.put("anonymousId", anonymousId);
         payload.put("status", "ACTIVE");
         payload.put("timestamp", System.currentTimeMillis());
-
         kafkaTemplate.send(TOPIC_STATUS_CHANGED, anonymousId, payload);
     }
 
@@ -282,24 +324,25 @@ public class HealthStatusService {
         // Note: resolveStatus sets to ACTIVE first, then we update to RECOVERED
         neo4jClient.query("MATCH (u:User {anonymousId: $id}) SET u.status = 'RECOVERED'")
                 .bind(anonymousId).to("id").run();
-        
+
         // Immunize in Redis for 30 days
         redisTemplate.opsForValue().set(STATUS_KEY_PREFIX + anonymousId, "RECOVERED");
         redisTemplate.expire(STATUS_KEY_PREFIX + anonymousId, java.time.Duration.ofDays(30));
     }
+
     private void checkFenceWindow(String anonymousId) {
         var userOpt = userNodeRepository.findById(anonymousId);
         if (userOpt.isPresent()) {
             var user = userOpt.get();
-            if (("SUSPECT".equals(user.getStatus()) || "PROBABLE".equals(user.getStatus())) 
+            if (("SUSPECT".equals(user.getStatus()) || "PROBABLE".equals(user.getStatus()))
                 && user.getStatusUpdatedAt() != null) {
-                
+
                 var settings = systemSettingsRepository.getSettings()
                         .orElseThrow(() -> new IllegalStateException("System Settings not initialized"));
-                
+
                 long fenceDurationMs = (long) settings.getMandatoryFenceDays() * 24 * 60 * 60 * 1000;
                 long elapsed = System.currentTimeMillis() - user.getStatusUpdatedAt();
-                
+
                 if (elapsed < fenceDurationMs) {
                     long remainingDays = (fenceDurationMs - elapsed) / (24 * 60 * 60 * 1000);
                     throw new FenceException("Cannot transition to ACTIVE. User is in mandatory fence window for " + remainingDays + " more days.");

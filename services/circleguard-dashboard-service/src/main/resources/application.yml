@@ -1,6 +1,18 @@
 spring:
   application:
     name: circleguard-dashboard-service
+  config:
+    # HU-14: Circuit Breaker and Retry settings for the promotion-service client.
+    import: classpath:resilience4j.yml
+  data:
+    redis:
+      # HU-16: Redis holds the cache-aside copy of the promotion-service statistics.
+      host: ${SPRING_DATA_REDIS_HOST:localhost}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      # Short timeouts: a slow or down Redis must not delay the dashboard; the cache is skipped instead.
+      connect-timeout: 500ms
+      timeout: 500ms
   datasource:
     url: jdbc:postgresql://localhost:5432/circleguard_dashboard
     username: admin
@@ -15,3 +27,29 @@ spring:
 
 server:
   port: 8084
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  health:
+    redis:
+      # HU-16: Redis is an optional cache. If Actuator is added, a Redis outage must not mark the
+      # dashboard DOWN (and get it restarted by its probes); the cache is skipped instead.
+      enabled: false
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+
+circleguard:
+  dashboard:
+    cache:
+      # HU-16: a repeated query within fresh-ttl is answered from Redis without calling promotion-service.
+      fresh-ttl: ${DASHBOARD_CACHE_FRESH_TTL:60s}
+      # The last known value is kept this long, to answer when promotion-service is down.
+      stale-ttl: ${DASHBOARD_CACHE_STALE_TTL:24h}

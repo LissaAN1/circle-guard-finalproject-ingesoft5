@@ -1,0 +1,36 @@
+# HU-24: Chaos Mesh installed through the HelmChart resource that k3s ships (no helm on the workstation).
+#   kubectl --context circleguard-dev apply -f infra/chaos/chaos-mesh.yaml
+# The controller only acts on namespaces annotated chaos-mesh.org/inject=enabled (enableFilterNamespace), and
+# install.sh annotates circleguard-dev only: stage, prod and kube-system can never receive an experiment.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chaos-mesh
+---
+apiVersion: helm.cattle.io/v1
+kind: HelmChart
+metadata:
+  name: chaos-mesh
+  namespace: kube-system
+spec:
+  repo: https://charts.chaos-mesh.org
+  chart: chaos-mesh
+  version: 2.7.2
+  targetNamespace: chaos-mesh
+  valuesContent: |-
+    chaosDaemon:
+      runtime: containerd
+      socketPath: /run/k3s/containerd/containerd.sock
+      resources:
+        requests: {cpu: 50m, memory: 64Mi}
+        limits: {cpu: 250m, memory: 256Mi}
+    controllerManager:
+      replicaCount: 1
+      enableFilterNamespace: true
+      resources:
+        requests: {cpu: 50m, memory: 128Mi}
+        limits: {cpu: 250m, memory: 384Mi}
+    dashboard:
+      create: false
+    dnsServer:
+      create: false

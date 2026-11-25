@@ -1,0 +1,16 @@
+# Accepted Trivy findings. The CRITICAL gate stays on for everything else.
+# Used ONLY by trivy-run.sh images via --ignorefile. Never rename it to .trivyignore: Trivy
+# auto-loads that name in every scan (IaC and secrets included).
+# Full justification and review plan: docs/operaciones/excepciones-trivy.md
+# Each entry MUST carry an expiry date (exp:) so it cannot become permanent.
+
+# spring-webmvc 6.2.19 (latest 6.2.x, no patched 6.x release exists; fixed only in 7.0.9 / Spring Boot 4).
+# Needs XsltView with a "/**" mapping that renders views. No service uses XsltView or view rendering.
+CVE-2026-47884 exp:2026-12-23
+# Needs Server-Sent Events with view fragments. No service uses SseEmitter or text/event-stream.
+CVE-2026-47890 exp:2026-12-23
+
+# spring-webflux 6.2.19 (same line, same fix only in 7.0.9 / Spring Boot 4).
+# Needs WebFlux functional endpoints (RouterFunction) deployed under DispatcherServlet. No service defines
+# any RouterFunction; notification uses WebFlux only for the WebClient (push and LMS calls).
+CVE-2026-47892 exp:2026-12-23

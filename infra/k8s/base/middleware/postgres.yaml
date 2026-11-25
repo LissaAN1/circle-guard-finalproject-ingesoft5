@@ -1,0 +1,76 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: circleguard
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: postgres
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          # Each service replica keeps its own connection pool; with 2 or more
+          # replicas per service (prod and HPA scale-out) the default of 100 runs out.
+          args: ["-c", "max_connections=300"]
+          ports:
+            - name: main
+              containerPort: 5432
+          env:
+            - {name: POSTGRES_USER, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_USER}}}
+            - {name: POSTGRES_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: DB_PASSWORD}}}
+            - {name: POSTGRES_DB, value: "postgres"}
+            - {name: PGDATA, value: "/var/lib/postgresql/data/pgdata"}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+            - name: init
+              mountPath: /docker-entrypoint-initdb.d
+              readOnly: true
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d postgres"]
+            initialDelaySeconds: 15
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {memory: 1536Mi}
+      volumes:
+        - name: init
+          configMap:
+            name: postgres-init
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: postgres
+  ports:
+    - name: main
+      port: 5432
+      targetPort: main

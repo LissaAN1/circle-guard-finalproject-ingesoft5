@@ -1,0 +1,24 @@
+# HU-17 / PI-131 - Prometheus de CircleGuard
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    environment: ${ENVIRONMENT}   # se expande con --enable-feature=expand-external-labels
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
+scrape_configs:
+  - job_name: circleguard-services
+    metrics_path: /actuator/prometheus
+    file_sd_configs:
+      - files: ["/etc/prometheus/targets/services.yml"]
+        refresh_interval: 30s
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

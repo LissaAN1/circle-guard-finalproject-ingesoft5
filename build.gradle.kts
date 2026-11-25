@@ -1,6 +1,6 @@
 plugins {
-    id("org.springframework.boot") version "3.2.4" apply false
-    id("io.spring.dependency-management") version "1.1.4" apply false
+    id("org.springframework.boot") version "3.5.16" apply false
+    id("io.spring.dependency-management") version "1.1.7" apply false
     kotlin("jvm") version "1.9.24" apply false
     kotlin("plugin.spring") version "1.9.24" apply false
     kotlin("plugin.jpa") version "1.9.24" apply false
@@ -16,6 +16,13 @@ allprojects {
 }
 
 subprojects {
+    // Security: the Boot 3.5.16 BOM ships Tomcat 10.1.55, which still has CRITICAL CVEs (fixed in >= 10.1.58).
+    // Picked up by the dependency-management plugin that each service applies.
+    extra["tomcat.version"] = "10.1.62"
+    // Security: the Boot 3.5.16 BOM ships Netty 4.1.135, affected by CVE-2026-75595 (CRITICAL, fixed in >= 4.1.137).
+    extra["netty.version"] = "4.1.141.Final"
+    // Security: the Boot 3.5.16 BOM ships Freemarker 2.3.34, affected by CVE-2026-84939 (CRITICAL, fixed in 2.3.35).
+    extra["freemarker.version"] = "2.3.35"
     apply(plugin = "java")
     apply(plugin = "org.jetbrains.kotlin.jvm")
     apply(plugin = "jacoco")
@@ -26,8 +33,8 @@ subprojects {
     }
 
     dependencies {
-        "implementation"(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
-        "testImplementation"(platform("org.springframework.boot:spring-boot-dependencies:3.2.4"))
+        "implementation"(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
+        "testImplementation"(platform("org.springframework.boot:spring-boot-dependencies:3.5.16"))
         "compileOnly"("org.projectlombok:lombok")
         "annotationProcessor"("org.projectlombok:lombok")
         "testCompileOnly"("org.projectlombok:lombok")
@@ -35,6 +42,8 @@ subprojects {
         "implementation"("org.jetbrains.kotlin:kotlin-reflect")
         "testImplementation"("org.springframework.boot:spring-boot-starter-test")
         "testRuntimeOnly"("com.h2database:h2")
+        "implementation"("org.springframework.boot:spring-boot-starter-actuator")
+        "runtimeOnly"("io.micrometer:micrometer-registry-prometheus")
     }
 
     tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {

@@ -8,3 +8,6 @@ infra/config.env text eol=lf
 mobile/nginx.conf text eol=lf
 gradlew text eol=lf
 gradlew.bat text eol=crlf
+*.tftpl text eol=lf
+*.tf text eol=lf
+*.tftest.hcl text eol=lf

@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: circleguard
+spec:
+  # No fixed replicas: the HorizontalPodAutoscaler of this service owns the count.
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: gateway
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      containers:
+        - name: gateway
+          image: circleguard-gateway-service
+          ports:
+            - name: http
+              containerPort: 8087
+          env:
+            - {name: SPRING_DATA_REDIS_HOST, value: "redis"}
+            - {name: SPRING_DATA_REDIS_PORT, value: "6379"}
+            - {name: SPRING_DATA_REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
+            - {name: REDIS_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: REDIS_PASSWORD}}}
+            - {name: JWT_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: JWT_SECRET}}}
+            - {name: QR_SECRET, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: QR_SECRET}}}
+            # HU-15: feature toggle from the ConfigMap of the environment.
+            - {name: FEATURE_DENY_SUSPECT_ENTRY, valueFrom: {configMapKeyRef: {name: circleguard-config, key: FEATURE_DENY_SUSPECT_ENTRY}}}
+          startupProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet: {path: /actuator/health, port: http}
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  labels:
+    app.kubernetes.io/name: gateway
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: gateway
+  ports:
+    - name: http
+      port: 8087
+      targetPort: http

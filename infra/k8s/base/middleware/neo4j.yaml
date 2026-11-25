@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: neo4j
+  labels:
+    app.kubernetes.io/name: neo4j
+    app.kubernetes.io/part-of: circleguard
+spec:
+  serviceName: neo4j
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: neo4j
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: neo4j
+        app.kubernetes.io/part-of: circleguard
+    spec:
+      # A Service named like this app makes Kubernetes inject <NAME>_PORT=tcp://...
+      # variables, which the image reads as its own settings and refuses to start.
+      enableServiceLinks: false
+      containers:
+        - name: neo4j
+          image: neo4j:5.26
+          command: ["sh", "-c", "export NEO4J_AUTH=neo4j/$GRAPH_DB_PASSWORD; exec /startup/docker-entrypoint.sh neo4j"]
+          ports:
+            - name: main
+              containerPort: 7687
+          env:
+            # The image reads every NEO4J_* variable as a setting, so the secret is exposed under another name.
+            - {name: GRAPH_DB_PASSWORD, valueFrom: {secretKeyRef: {name: circleguard-secrets, key: NEO4J_PASSWORD}}}
+            - {name: NEO4J_PLUGINS, value: "[\"apoc\"]"}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket: {port: main}
+            initialDelaySeconds: 60
+            periodSeconds: 15
+            timeoutSeconds: 10
+            failureThreshold: 12
+          resources:
+            requests: {cpu: 100m, memory: 512Mi}
+            limits: {memory: 1536Mi}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: neo4j
+  labels:
+    app.kubernetes.io/name: neo4j
+    app.kubernetes.io/part-of: circleguard
+spec:
+  selector:
+    app.kubernetes.io/name: neo4j
+  ports:
+    - name: main
+      port: 7687
+      targetPort: main

@@ -79,3 +79,23 @@ Los siguientes valores son **estimaciones de tarifa pública Linux On-Demand en 
 **Control de gastos:** detener `dev`, `stage`, `prod` y `nexus` al finalizar el trabajo, coordinando con el equipo. Jenkins y SonarQube se mantienen detenidas cuando no se usan. EBS permanece y se factura aun con EC2 detenida. La restauración de instancias puede cambiar sus IP públicas; Nexus mantiene su IP privada dentro de la VPC mientras conserve la interfaz correspondiente.
 
 **Referencias consultadas:** AWS Pricing Calculator (https://calculator.aws/); precios públicos de `m7i-flex.large` en us-east-1 (https://www.economize.cloud/resources/aws/pricing/ec2/m7i-flex.large/) y de `c7i-flex.large` (https://www.economize.cloud/resources/aws/pricing/ec2/c7i-flex.large/). Consulta del 2026-11-08.
+---
+
+## Parte 2: arquitectura Terraform y K3s (actualización de TEC-11, 2026-11-22)
+
+Las dos secciones anteriores son **estimaciones de la Parte 1** (TEC-04 y HU-02) y se conservan sin cambios como
+antecedente histórico. Su tabla «Real cost (fill in)» no se completó durante la Parte 1.
+
+La Parte 2 agregó seis nodos K3s `m7i-flex.large` creados con Terraform (1 en dev, 2 en stage y 3 en prod) y 240 GB de
+EBS, sin borrar las seis EC2 de la Parte 1. La estimación actualizada, el gasto real registrado en Cost Explorer y la
+comparación entre ambos están en [`docs/costos/costos-parte-2.md`](../../docs/costos/costos-parte-2.md). Resumen:
+
+| Concepto | Parte 1 (estimado) | Parte 2 (estimado) | Real |
+|:---|---:|---:|---:|
+| USD por hora con lo que se puede encender a la vez | 0,5718 (6 EC2) | 0,7842 (Jenkins, Nexus y 6 nodos; límite de 16 vCPU) | — |
+| USD por mes en horario laboral (8 h × 22 días) | 116,64 | 173,22 | — |
+| USD por mes con todo detenido (EBS) | 16,00 | 35,20 | — |
+| Gasto bruto del 1 al 20 de noviembre de 2026 | — | — | 27,45 (cubierto por créditos; neto 0,00) |
+
+Los presupuestos por ambiente y la escala a cero de los nodos (HU-25) están en
+[`docs/costos/hu-25-finops.md`](../../docs/costos/hu-25-finops.md).

@@ -7,6 +7,13 @@ def call(Map cfg = [:]) {
         error("cgE2E: environment must be 'dev' or 'stage'")
     }
 
+    // Preserve the existing Docker Compose test path; use an independent
+    // Kubernetes runner only for releases targeting K3s.
+    if (env.CG_CD_PLATFORM == 'k8s') {
+        cgK8sE2E(environment: envName)
+        return
+    }
+
     String sshCredential = envName == 'dev'
         ? 'circleguard-dev-ssh'
         : 'circleguard-stage-ssh'
